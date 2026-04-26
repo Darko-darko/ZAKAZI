@@ -900,6 +900,20 @@ export type Database = {
           sort_order: number
         }[]
       }
+      get_public_slots: {
+        Args: {
+          p_date: string
+          p_provider_id: string
+          p_service_id: string
+          p_worker_id?: string
+        }
+        Returns: {
+          ends_at: string
+          starts_at: string
+          worker_id: string
+          worker_name: string
+        }[]
+      }
       get_public_services: {
         Args: { p_provider_id: string }
         Returns: {

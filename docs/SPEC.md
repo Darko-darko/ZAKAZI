@@ -537,9 +537,8 @@ Super admin može promeniti `provider.agent_commission_percent` u svakom trenutk
 3. Oduzmi buffer_minutes između termina
 4. Oduzmi bookinge (status: confirmed, pending)
 5. Oduzmi time_off
-6. Podeli na 10-minutne slotove
-7. Nudi grupe uzastopnih slotova za trajanje usluge
-8. Ne prikazuj: prošlost, < min_notice, > max_days_ahead
+6. Korak slota = trajanje izabrane usluge (poravnato sa početkom smene)
+7. Ne prikazuj: prošlost, < min_notice, > max_days_ahead
 ```
 
 ### Race condition zaštita
