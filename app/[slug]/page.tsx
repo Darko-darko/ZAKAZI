@@ -140,7 +140,7 @@ export default async function PublicProviderPage({
             {provider.phone ? (
               <a
                 href={`tel:${provider.phone}`}
-                className="inline-flex min-h-12 items-center justify-center rounded-md border border-current px-5 font-semibold transition hover:bg-white/10"
+                className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/20 bg-black/70 px-5 font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/80"
               >
                 Pozovi
               </a>

@@ -761,7 +761,7 @@ function MiniSitePreview({
                 Zakazi termin
               </span>
               {draft.phone ? (
-                <span className="inline-flex min-h-11 items-center justify-center rounded-md border border-current px-4 text-sm font-semibold">
+                <span className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/20 bg-black/70 px-4 text-sm font-semibold text-white shadow-sm backdrop-blur-sm">
                   Pozovi
                 </span>
               ) : null}
