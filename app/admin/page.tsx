@@ -91,7 +91,7 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Link
             href="/admin/termini"
             className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
@@ -126,6 +126,15 @@ export default async function AdminPage() {
             <h2 className="font-semibold text-foreground">Smene</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Radno vreme i raspored.
+            </p>
+          </Link>
+          <Link
+            href="/admin/sajt"
+            className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
+          >
+            <h2 className="font-semibold text-foreground">Mini sajt</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Brending, tekstovi i live preview.
             </p>
           </Link>
         </div>

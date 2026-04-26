@@ -14,6 +14,51 @@ function formatPrice(price: number | null) {
   return `${price.toLocaleString("sr-RS")} RSD`;
 }
 
+function getFontClass(fontChoice: string | null) {
+  if (fontChoice === "serif") {
+    return "font-serif";
+  }
+
+  if (fontChoice === "elegant") {
+    return "font-serif";
+  }
+
+  return "font-sans";
+}
+
+function getThemeClasses(siteTheme: string | null) {
+  if (siteTheme === "dark") {
+    return {
+      page: "bg-neutral-950 text-neutral-50",
+      card: "border-neutral-800 bg-neutral-900 text-neutral-50",
+      heading: "text-neutral-50",
+      muted: "text-neutral-300",
+      border: "divide-neutral-800 border-neutral-800",
+      avatar: "bg-neutral-800",
+    };
+  }
+
+  if (siteTheme === "light") {
+    return {
+      page: "bg-sky-50 text-slate-950",
+      card: "border-sky-100 bg-white text-slate-950 shadow-sm",
+      heading: "text-slate-950",
+      muted: "text-slate-600",
+      border: "divide-sky-100 border-sky-100",
+      avatar: "bg-sky-100",
+    };
+  }
+
+  return {
+    page: "bg-background text-foreground",
+    card: "border-border bg-card text-foreground",
+    heading: "text-foreground",
+    muted: "text-muted-foreground",
+    border: "divide-border border-border",
+    avatar: "bg-muted",
+  };
+}
+
 export default async function PublicProviderPage({
   params,
 }: PublicProviderPageProps) {
@@ -38,10 +83,20 @@ export default async function PublicProviderPage({
     ]);
 
   const heroImage = provider.cover_url ?? gallery?.[0]?.image_url ?? null;
+  const heroText = provider.intro_text;
+  const theme = getThemeClasses(provider.site_theme);
 
   return (
-    <main className="flex-1 bg-background">
-      <section className="relative min-h-[72svh] overflow-hidden bg-primary text-primary-foreground">
+    <main
+      className={`flex-1 bg-background ${getFontClass(provider.font_choice)}`}
+    >
+      <section
+        className="relative min-h-[72svh] overflow-hidden"
+        style={{
+          backgroundColor: provider.primary_color,
+          color: provider.text_color,
+        }}
+      >
         {heroImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -50,8 +105,8 @@ export default async function PublicProviderPage({
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : null}
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="relative mx-auto flex min-h-[72svh] w-full max-w-5xl flex-col justify-end px-5 pb-7 pt-20 sm:px-8">
+        {heroImage ? <div className="absolute inset-0 bg-black/45" /> : null}
+        <div className="relative mx-auto flex min-h-[72svh] w-full max-w-5xl flex-col justify-end px-4 pb-6 pt-16 sm:px-8 sm:pb-7 sm:pt-20">
           {provider.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -63,25 +118,29 @@ export default async function PublicProviderPage({
           <p className="text-sm font-medium uppercase tracking-wide opacity-85">
             Online zakazivanje
           </p>
-          <h1 className="mt-2 max-w-2xl text-4xl font-bold tracking-tight sm:text-6xl">
+          <h1 className="mt-2 max-w-2xl break-words text-[clamp(2rem,12vw,3.75rem)] font-bold leading-tight tracking-tight">
             {provider.name}
           </h1>
-          {provider.intro_text || provider.description ? (
+          {heroText ? (
             <p className="mt-4 max-w-2xl text-base leading-7 opacity-90 sm:text-lg">
-              {provider.intro_text ?? provider.description}
+              {heroText}
             </p>
           ) : null}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link
               href={`/${provider.slug}/book`}
-              className="inline-flex min-h-12 items-center justify-center rounded-md bg-white px-5 font-semibold text-black transition hover:bg-white/90"
+              className="inline-flex min-h-12 items-center justify-center rounded-md px-5 font-semibold transition hover:opacity-90"
+              style={{
+                backgroundColor: provider.text_color,
+                color: provider.primary_color,
+              }}
             >
               Zakaži termin
             </Link>
             {provider.phone ? (
               <a
                 href={`tel:${provider.phone}`}
-                className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/40 px-5 font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex min-h-12 items-center justify-center rounded-md border border-current px-5 font-semibold transition hover:bg-white/10"
               >
                 Pozovi
               </a>
@@ -90,34 +149,49 @@ export default async function PublicProviderPage({
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
-        <div className="grid gap-8 lg:grid-cols-[1fr_18rem]">
+      <section className={theme.page}>
+        <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
+        {provider.description ? (
+          <div className={`mb-8 rounded-md border p-5 sm:p-6 ${theme.card}`}>
+            <p
+              className={`whitespace-pre-line break-words text-base leading-7 ${theme.muted}`}
+            >
+              {provider.description}
+            </p>
+          </div>
+        ) : null}
+
+          <div className="grid gap-8 lg:grid-cols-[1fr_18rem]">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            <h2 className={`text-2xl font-bold tracking-tight ${theme.heading}`}>
               Usluge
             </h2>
-            <div className="mt-4 divide-y divide-border rounded-md border border-border bg-card">
+            <div
+              className={`mt-4 divide-y rounded-md border ${theme.card} ${theme.border}`}
+            >
               {services?.length ? (
                 services.map((service) => (
                   <div
                     key={service.id}
-                    className="flex items-start justify-between gap-4 p-4"
+                    className="flex flex-col gap-2 p-4 min-[380px]:flex-row min-[380px]:items-start min-[380px]:justify-between min-[380px]:gap-4"
                   >
                     <div>
-                      <p className="font-semibold text-foreground">
+                      <p className={`font-semibold ${theme.heading}`}>
                         {service.name}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className={`mt-1 text-sm ${theme.muted}`}>
                         {service.duration_minutes} min
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-foreground">
+                    <p
+                      className={`text-sm font-semibold min-[380px]:shrink-0 ${theme.heading}`}
+                    >
                       {formatPrice(service.price)}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="p-4 text-sm text-muted-foreground">
+                <p className={`p-4 text-sm ${theme.muted}`}>
                   Usluge još nisu objavljene.
                 </p>
               )}
@@ -125,21 +199,8 @@ export default async function PublicProviderPage({
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-md border border-border bg-card p-4">
-              <h2 className="font-semibold text-foreground">Kontakt</h2>
-              <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                {provider.address || provider.city ? (
-                  <p>
-                    {[provider.address, provider.city]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
-                ) : null}
-                {provider.phone ? <p>{provider.phone}</p> : null}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-card p-4">
-              <h2 className="font-semibold text-foreground">Tim</h2>
+            <div className={`rounded-md border p-4 ${theme.card}`}>
+              <h2 className={`font-semibold ${theme.heading}`}>Tim</h2>
               <div className="mt-3 space-y-3">
                 {workers?.length ? (
                   workers.slice(0, 4).map((worker) => (
@@ -152,21 +213,35 @@ export default async function PublicProviderPage({
                           className="size-10 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="size-10 rounded-full bg-muted" />
+                        <div className={`size-10 rounded-full ${theme.avatar}`} />
                       )}
-                      <p className="text-sm font-medium text-foreground">
+                      <p className={`text-sm font-medium ${theme.heading}`}>
                         {worker.name}
                       </p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className={`text-sm ${theme.muted}`}>
                     Tim još nije objavljen.
                   </p>
                 )}
               </div>
             </div>
+            <div className={`rounded-md border p-4 ${theme.card}`}>
+              <h2 className={`font-semibold ${theme.heading}`}>Kontakt</h2>
+              <div className={`mt-3 space-y-2 text-sm ${theme.muted}`}>
+                {provider.address || provider.city ? (
+                  <p>
+                    {[provider.address, provider.city]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                ) : null}
+                {provider.phone ? <p>{provider.phone}</p> : null}
+              </div>
+            </div>
           </aside>
+          </div>
         </div>
       </section>
     </main>

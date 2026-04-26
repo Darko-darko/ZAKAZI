@@ -419,6 +419,7 @@ export type Database = {
           plan_status: string
           primary_color: string
           ref_code: string | null
+          site_theme: string
           slug: string
           text_color: string
           tiktok_url: string | null
@@ -456,6 +457,7 @@ export type Database = {
           plan_status?: string
           primary_color?: string
           ref_code?: string | null
+          site_theme?: string
           slug: string
           text_color?: string
           tiktok_url?: string | null
@@ -493,6 +495,7 @@ export type Database = {
           plan_status?: string
           primary_color?: string
           ref_code?: string | null
+          site_theme?: string
           slug?: string
           text_color?: string
           tiktok_url?: string | null
@@ -912,6 +915,7 @@ export type Database = {
           name: string
           phone: string
           primary_color: string
+          site_theme: string
           slug: string
           text_color: string
           tiktok_url: string
