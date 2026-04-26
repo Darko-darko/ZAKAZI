@@ -2,6 +2,8 @@ alter table public.providers
 add column if not exists site_theme text not null default 'default'
 check (site_theme in ('default', 'light', 'dark'));
 
+drop function if exists public.get_public_provider(text);
+
 create or replace function public.get_public_provider(p_slug text)
 returns table (
   id uuid,
