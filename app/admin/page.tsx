@@ -17,13 +17,35 @@ export default async function AdminPage() {
 
   const { data: provider } = await supabase
     .from("providers")
-    .select("name, slug, city, plan_status")
+    .select("id, name, slug, city, plan_status")
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
   if (!provider) {
     redirect("/register/onboarding");
   }
+
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Belgrade",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [{ count: todayCount }, { count: upcomingCount }] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .gte("starts_at", `${today}T00:00:00+01:00`)
+      .lte("starts_at", `${today}T23:59:59+01:00`)
+      .in("status", ["pending", "confirmed", "noshow"]),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .eq("status", "confirmed")
+      .gte("starts_at", new Date().toISOString()),
+  ]);
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -57,15 +79,28 @@ export default async function AdminPage() {
           </div>
           <div className="rounded-md border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground">Danas</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">0</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {todayCount ?? 0}
+            </p>
           </div>
           <div className="rounded-md border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Novi zahtevi</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">0</p>
+            <p className="text-sm text-muted-foreground">Budući termini</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {upcomingCount ?? 0}
+            </p>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            href="/admin/termini"
+            className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
+          >
+            <h2 className="font-semibold text-foreground">Termini</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ko je zakazao, kada i kod koga.
+            </p>
+          </Link>
           <Link
             href="/admin/radnici"
             className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
@@ -93,12 +128,6 @@ export default async function AdminPage() {
               Radno vreme i raspored.
             </p>
           </Link>
-          <div className="rounded-md border border-border bg-card p-5 opacity-70">
-            <h2 className="font-semibold text-foreground">Sajt</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tekst, brending i galerija.
-            </p>
-          </div>
         </div>
       </section>
     </main>

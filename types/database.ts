@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_commissions: {
@@ -900,6 +925,16 @@ export type Database = {
           sort_order: number
         }[]
       }
+      get_public_services: {
+        Args: { p_provider_id: string; p_worker_id?: string }
+        Returns: {
+          duration_minutes: number
+          id: string
+          name: string
+          price: number
+          sort_order: number
+        }[]
+      }
       get_public_slots: {
         Args: {
           p_date: string
@@ -914,16 +949,6 @@ export type Database = {
           worker_name: string
         }[]
       }
-      get_public_services: {
-        Args: { p_provider_id: string }
-        Returns: {
-          duration_minutes: number
-          id: string
-          name: string
-          price: number
-          sort_order: number
-        }[]
-      }
       get_public_workers: {
         Args: { p_provider_id: string }
         Returns: {
@@ -931,6 +956,13 @@ export type Database = {
           id: string
           name: string
           photo_url: string
+        }[]
+      }
+      get_referral_agent: {
+        Args: { p_ref_code: string }
+        Returns: {
+          id: string
+          ref_code: string
         }[]
       }
     }
@@ -1061,6 +1093,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

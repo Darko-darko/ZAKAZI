@@ -544,14 +544,20 @@ Super admin može promeniti `provider.agent_commission_percent` u svakom trenutk
 ### Race condition zaštita
 
 ```
-Booking kreira se sa status='pending'
-pg_cron svakih 5 minuta:
-  UPDATE bookings SET status='expired'
-  WHERE status='pending'
-  AND created_at < now() - interval '5 minutes'
+Booking iz javne strane kreira se odmah sa status='confirmed'
+Razlog: admin ne treba ručno da potvrđuje svaki termin u MVP-u.
+Status 'pending' ostaje rezervisan za buduće online plaćanje ili ručne tokove.
+Cancelled/expired se ne računaju kao zauzeti slotovi
+```
 
-Klijent potvrdi → status='confirmed'
-Expired se ne računaju kao zauzeti slotovi
+### No-show evidencija
+
+```
+Admin moze rucno oznaciti zakazan termin kao status='noshow'
+Ako isti telefon ili email kasnije zakaze novi termin:
+  - admin pregled termina prikazuje upozorenje "Ranije nije dosao"
+  - cilj je da admin/radnik telefonom proveri termin pre dolaska
+Kasnije: poslati email/in-app notifikaciju adminu cim se takav termin kreira
 ```
 
 ### Rotacija smena

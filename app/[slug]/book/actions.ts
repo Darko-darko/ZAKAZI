@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ANY_WORKER, buildBookingUrl } from "./utils";
 
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -13,25 +14,27 @@ function redirectWithError(
   message: string,
   formData: FormData,
 ): never {
-  const params = new URLSearchParams();
-  const serviceId = readString(formData, "service_id");
   const workerId = readString(formData, "worker_id");
-  const date = readString(formData, "date");
-
-  if (serviceId) {
-    params.set("service", serviceId);
-  }
+  const serviceId = readString(formData, "service_id");
+  const startsAt = readString(formData, "starts_at");
+  const search = new URLSearchParams();
 
   if (workerId) {
-    params.set("worker", workerId);
+    search.set("worker", workerId);
+  } else {
+    search.set("worker", ANY_WORKER);
   }
 
-  if (date) {
-    params.set("date", date);
+  if (serviceId) {
+    search.set("service", serviceId);
   }
 
-  params.set("error", message);
-  redirect(`/${slug}/book?${params.toString()}`);
+  if (startsAt) {
+    search.set("slot", `${workerId}|${startsAt}`);
+  }
+
+  search.set("error", message);
+  redirect(`/${slug}/book?${search.toString()}`);
 }
 
 export async function createBookingAction(slug: string, formData: FormData) {
@@ -45,16 +48,23 @@ export async function createBookingAction(slug: string, formData: FormData) {
     redirectWithError(slug, "Stranica za zakazivanje nije dostupna.", formData);
   }
 
-  const slot = readString(formData, "slot");
-  const [workerId, startsAt] = slot.split("|");
+  const workerId = readString(formData, "worker_id");
   const serviceId = readString(formData, "service_id");
+  const startsAt = readString(formData, "starts_at");
   const clientName = readString(formData, "client_name");
   const clientPhone = readString(formData, "client_phone");
   const clientEmail = readString(formData, "client_email");
   const notes = readString(formData, "notes") || undefined;
 
-  if (!workerId || !serviceId || !startsAt || !clientName || !clientPhone) {
-    redirectWithError(slug, "Izaberi termin i popuni ime i telefon.", formData);
+  if (
+    !workerId ||
+    !serviceId ||
+    !startsAt ||
+    !clientName ||
+    !clientPhone ||
+    !clientEmail
+  ) {
+    redirectWithError(slug, "Popuni ime, telefon i email.", formData);
   }
 
   const { data: bookingId, error } = await supabase.rpc(
@@ -65,7 +75,7 @@ export async function createBookingAction(slug: string, formData: FormData) {
       p_service_id: serviceId,
       p_client_name: clientName,
       p_client_phone: clientPhone,
-      p_client_email: clientEmail || "",
+      p_client_email: clientEmail,
       p_starts_at: startsAt,
       p_notes: notes,
     },
@@ -79,5 +89,5 @@ export async function createBookingAction(slug: string, formData: FormData) {
     );
   }
 
-  redirect(`/${slug}/book?success=1`);
+  redirect(buildBookingUrl(slug, {}) + "?success=1");
 }
