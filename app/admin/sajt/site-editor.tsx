@@ -761,7 +761,13 @@ function MiniSitePreview({
                 Zakazi termin
               </span>
               {draft.phone ? (
-                <span className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/20 bg-black/70 px-4 text-sm font-semibold text-white shadow-sm backdrop-blur-sm">
+                <span
+                  className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold"
+                  style={{
+                    backgroundColor: draft.primary_color,
+                    color: draft.text_color,
+                  }}
+                >
                   Pozovi
                 </span>
               ) : null}
