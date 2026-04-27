@@ -20,10 +20,6 @@ export async function getPostLoginRedirect(
   supabase: SupabaseClient<Database>,
   user: User,
 ) {
-  if (isSuperAdminEmail(user.email)) {
-    return "/superadmin";
-  }
-
   const { data: provider } = await supabase
     .from("providers")
     .select("id")
@@ -42,6 +38,10 @@ export async function getPostLoginRedirect(
 
   if (agent) {
     return "/agent";
+  }
+
+  if (isSuperAdminEmail(user.email)) {
+    return "/superadmin";
   }
 
   return "/register/onboarding";

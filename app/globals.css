@@ -35,6 +35,13 @@
   --color-border: hsl(0 0% 89.8%);
   --color-input: hsl(0 0% 89.8%);
   --color-ring: hsl(0 0% 9%);
+
+  --color-brand: hsl(174 61% 30%);
+  --color-brand-foreground: hsl(0 0% 98%);
+  --color-brand-soft: hsl(174 54% 93%);
+  --color-warm: hsl(36 92% 55%);
+  --color-warm-foreground: hsl(0 0% 9%);
+  --color-warm-soft: hsl(39 100% 94%);
 }
 
 body {

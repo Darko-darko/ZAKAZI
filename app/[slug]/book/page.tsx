@@ -279,6 +279,16 @@ async function Step3({
     p_date: selectedDate,
     ...(isAnyWorker ? {} : { p_worker_id: workerParam }),
   });
+  const orderedSlots = (slots ?? []).slice().sort((a, b) => {
+    const timeCompare =
+      new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+
+    if (timeCompare !== 0) {
+      return timeCompare;
+    }
+
+    return a.worker_name.localeCompare(b.worker_name, "sr-Latn-RS");
+  });
 
   return (
     <StepSlot
@@ -286,7 +296,7 @@ async function Step3({
       workerParam={workerParam}
       serviceId={serviceId}
       selectedDate={selectedDate}
-      slots={slots ?? []}
+      slots={orderedSlots}
       showWorkerName={isAnyWorker}
     />
   );

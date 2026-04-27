@@ -537,7 +537,7 @@ Super admin može promeniti `provider.agent_commission_percent` u svakom trenutk
 3. Oduzmi buffer_minutes između termina
 4. Oduzmi bookinge (status: confirmed, pending)
 5. Oduzmi time_off
-6. Korak slota = trajanje izabrane usluge (poravnato sa početkom smene)
+6. Korak slota = trajanje izabrane usluge, poravnato sa početkom svakog slobodnog bloka (početak smene, kraj pauze, kraj postojećeg termina + buffer)
 7. Ne prikazuj: prošlost, < min_notice, > max_days_ahead
 ```
 
