@@ -17,24 +17,23 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0f766e",
-          borderRadius: 14,
         }}
       >
         <div
           style={{
-            width: 42,
-            height: 42,
+            width: 48,
+            height: 48,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            borderRadius: 10,
+            borderRadius: 12,
             background: "#ffffff",
+            border: "4px solid #0f766e",
           }}
         >
           <div
             style={{
-              height: 12,
+              height: 13,
               background: "#f5a524",
             }}
           />
@@ -44,13 +43,18 @@ export default function Icon() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#0f766e",
-              fontSize: 26,
-              fontWeight: 900,
-              lineHeight: 1,
             }}
           >
-            z
+            <div
+              style={{
+                width: 23,
+                height: 13,
+                borderLeft: "5px solid #0f766e",
+                borderBottom: "5px solid #0f766e",
+                transform: "rotate(-45deg)",
+                marginTop: -4,
+              }}
+            />
           </div>
         </div>
       </div>

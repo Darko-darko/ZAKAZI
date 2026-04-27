@@ -17,18 +17,18 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0f766e",
         }}
       >
         <div
           style={{
-            width: 118,
-            height: 118,
+            width: 128,
+            height: 128,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            borderRadius: 26,
+            borderRadius: 28,
             background: "#ffffff",
+            border: "10px solid #0f766e",
           }}
         >
           <div
@@ -43,13 +43,18 @@ export default function AppleIcon() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#0f766e",
-              fontSize: 76,
-              fontWeight: 900,
-              lineHeight: 1,
             }}
           >
-            z
+            <div
+              style={{
+                width: 62,
+                height: 36,
+                borderLeft: "12px solid #0f766e",
+                borderBottom: "12px solid #0f766e",
+                transform: "rotate(-45deg)",
+                marginTop: -10,
+              }}
+            />
           </div>
         </div>
       </div>
