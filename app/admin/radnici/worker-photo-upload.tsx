@@ -148,7 +148,7 @@ export function WorkerPhotoUpload({
                 onClick={removePhoto}
                 className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Ukloni fotografiju
+                {isPending ? "Cuvanje..." : "Ukloni fotografiju"}
               </button>
             ) : null}
           </div>
@@ -159,7 +159,7 @@ export function WorkerPhotoUpload({
         </div>
       </div>
 
-      {message ? (
+      {message || isPending ? (
         <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
           {isPending ? "Cuvanje..." : message}
         </p>

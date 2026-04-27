@@ -1,8 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentProvider } from "@/lib/admin/provider";
+
+type WorkerActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
 
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -14,12 +19,20 @@ function readNullableString(formData: FormData, key: string) {
   return value || null;
 }
 
-export async function createWorkerAction(formData: FormData) {
+export async function createWorkerAction(
+  _prevState: WorkerActionState,
+  formData: FormData,
+) {
+  void _prevState;
+
   const { supabase, provider } = await getCurrentProvider();
   const name = readString(formData, "name");
 
   if (!name) {
-    throw new Error("Ime radnika je obavezno.");
+    return {
+      status: "error" as const,
+      message: "Ime radnika je obavezno.",
+    };
   }
 
   const { error } = await supabase.from("workers").insert({
@@ -31,19 +44,31 @@ export async function createWorkerAction(formData: FormData) {
   });
 
   if (error) {
-    throw new Error("Radnik nije sačuvan. Pokušaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije sacuvan. Pokusaj ponovo.",
+    };
   }
 
   revalidatePath("/admin/radnici");
   redirect("/admin/radnici");
 }
 
-export async function updateWorkerAction(workerId: string, formData: FormData) {
+export async function updateWorkerAction(
+  workerId: string,
+  _prevState: WorkerActionState,
+  formData: FormData,
+) {
+  void _prevState;
+
   const { supabase, provider } = await getCurrentProvider();
   const name = readString(formData, "name");
 
   if (!name) {
-    throw new Error("Ime radnika je obavezno.");
+    return {
+      status: "error" as const,
+      message: "Ime radnika je obavezno.",
+    };
   }
 
   const { error } = await supabase
@@ -57,18 +82,28 @@ export async function updateWorkerAction(workerId: string, formData: FormData) {
     .eq("provider_id", provider.id);
 
   if (error) {
-    throw new Error("Izmene nisu sačuvane. Pokušaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Izmene nisu sacuvane. Pokusaj ponovo.",
+    };
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${workerId}`);
-  redirect("/admin/radnici");
+  refresh();
+  return {
+    status: "success" as const,
+    message: "Izmene su sacuvane.",
+  };
 }
 
 export async function setWorkerOnlineBookingAction(
   workerId: string,
   enabled: boolean,
+  _prevState: WorkerActionState,
 ) {
+  void _prevState;
+
   const { supabase, provider } = await getCurrentProvider();
 
   const { data: worker } = await supabase
@@ -79,11 +114,17 @@ export async function setWorkerOnlineBookingAction(
     .maybeSingle();
 
   if (!worker) {
-    throw new Error("Radnik nije pronadjen.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije pronadjen.",
+    };
   }
 
   if (worker.archived_at) {
-    throw new Error("Arhiviran radnik ne moze u online zakazivanje.");
+    return {
+      status: "error" as const,
+      message: "Arhiviran radnik ne moze u online zakazivanje.",
+    };
   }
 
   if (enabled) {
@@ -102,7 +143,10 @@ export async function setWorkerOnlineBookingAction(
     ]);
 
     if (!services?.length || !schedules?.length) {
-      throw new Error("Radniku nedostaju usluge ili raspored.");
+      return {
+        status: "error" as const,
+        message: "Radniku nedostaju usluge ili raspored.",
+      };
     }
   }
 
@@ -113,20 +157,36 @@ export async function setWorkerOnlineBookingAction(
     .eq("provider_id", provider.id);
 
   if (error) {
-    throw new Error("Status online zakazivanja nije sacuvan.");
+    return {
+      status: "error" as const,
+      message: "Status online zakazivanja nije sacuvan.",
+    };
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${worker.id}`);
-  redirect(`/admin/radnici/${worker.id}`);
+  refresh();
+  return {
+    status: "success" as const,
+    message: enabled
+      ? "Radnik je ukljucen u online zakazivanje."
+      : "Radnik je iskljucen iz online zakazivanja.",
+  };
 }
 
-export async function archiveWorkerAction(workerId: string, formData: FormData) {
+export async function archiveWorkerAction(
+  workerId: string,
+  _prevState: WorkerActionState,
+  formData: FormData,
+) {
   const { supabase, provider } = await getCurrentProvider();
   const confirmation = readString(formData, "confirm_archive").toLowerCase();
 
   if (confirmation !== "da") {
-    throw new Error("Za arhiviranje upisi da.");
+    return {
+      status: "error" as const,
+      message: "Za arhiviranje upisi da.",
+    };
   }
 
   const { error } = await supabase
@@ -139,15 +199,23 @@ export async function archiveWorkerAction(workerId: string, formData: FormData) 
     .eq("provider_id", provider.id);
 
   if (error) {
-    throw new Error("Radnik nije arhiviran. Pokusaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije arhiviran. Pokusaj ponovo.",
+    };
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${workerId}`);
-  redirect("/admin/radnici");
+  redirect(`/admin/radnici/${workerId}`);
 }
 
-export async function restoreWorkerAction(workerId: string) {
+export async function restoreWorkerAction(
+  workerId: string,
+  _prevState: WorkerActionState,
+) {
+  void _prevState;
+
   const { supabase, provider } = await getCurrentProvider();
 
   const { error } = await supabase
@@ -160,12 +228,19 @@ export async function restoreWorkerAction(workerId: string) {
     .eq("provider_id", provider.id);
 
   if (error) {
-    throw new Error("Radnik nije vracen. Pokusaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije vracen. Pokusaj ponovo.",
+    };
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${workerId}`);
-  redirect(`/admin/radnici/${workerId}`);
+  refresh();
+  return {
+    status: "success" as const,
+    message: "Radnik je vracen.",
+  };
 }
 
 export async function updateWorkerPhotoAction(
@@ -216,6 +291,7 @@ export async function updateWorkerPhotoAction(
 
 export async function updateWorkerServicesAction(
   workerId: string,
+  _prevState: WorkerActionState,
   formData: FormData,
 ) {
   const { supabase, provider } = await getCurrentProvider();
@@ -235,7 +311,10 @@ export async function updateWorkerServicesAction(
     .maybeSingle();
 
   if (!worker) {
-    throw new Error("Radnik nije pronadjen.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije pronadjen.",
+    };
   }
 
   const { error: deleteError } = await supabase
@@ -244,7 +323,10 @@ export async function updateWorkerServicesAction(
     .eq("worker_id", worker.id);
 
   if (deleteError) {
-    throw new Error("Usluge radnika nisu sacuvane. Pokusaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Usluge radnika nisu sacuvane. Pokusaj ponovo.",
+    };
   }
 
   if (selectedServiceIds.length) {
@@ -254,8 +336,11 @@ export async function updateWorkerServicesAction(
       .eq("provider_id", provider.id)
       .in("id", selectedServiceIds);
 
-    if (servicesError) {
-      throw new Error("Usluge radnika nisu sacuvane. Pokusaj ponovo.");
+    if (servicesError || !services) {
+      return {
+        status: "error" as const,
+        message: "Usluge radnika nisu sacuvane. Pokusaj ponovo.",
+      };
     }
 
     const rows = services.map((service) => ({
@@ -269,18 +354,26 @@ export async function updateWorkerServicesAction(
         .insert(rows);
 
       if (insertError) {
-        throw new Error("Usluge radnika nisu sacuvane. Pokusaj ponovo.");
+        return {
+          status: "error" as const,
+          message: "Usluge radnika nisu sacuvane. Pokusaj ponovo.",
+        };
       }
     }
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${worker.id}`);
-  redirect(`/admin/radnici/${worker.id}`);
+  refresh();
+  return {
+    status: "success" as const,
+    message: "Usluge radnika su sacuvane.",
+  };
 }
 
 export async function updateWorkerScheduleAction(
   workerId: string,
+  _prevState: WorkerActionState,
   formData: FormData,
 ) {
   const { supabase, provider } = await getCurrentProvider();
@@ -293,7 +386,10 @@ export async function updateWorkerScheduleAction(
     .maybeSingle();
 
   if (!worker) {
-    throw new Error("Radnik nije pronadjen.");
+    return {
+      status: "error" as const,
+      message: "Radnik nije pronadjen.",
+    };
   }
 
   const selectedRows = Array.from({ length: 7 }, (_, day) => ({
@@ -311,8 +407,11 @@ export async function updateWorkerScheduleAction(
       .eq("provider_id", provider.id)
       .in("id", selectedShiftIds);
 
-    if (shiftsError || shifts.length !== selectedShiftIds.length) {
-      throw new Error("Raspored nije sacuvan. Izabrana smena nije ispravna.");
+    if (shiftsError || !shifts || shifts.length !== selectedShiftIds.length) {
+      return {
+        status: "error" as const,
+        message: "Raspored nije sacuvan. Izabrana smena nije ispravna.",
+      };
     }
   }
 
@@ -322,7 +421,10 @@ export async function updateWorkerScheduleAction(
     .eq("worker_id", worker.id);
 
   if (deleteError) {
-    throw new Error("Raspored nije sacuvan. Pokusaj ponovo.");
+    return {
+      status: "error" as const,
+      message: "Raspored nije sacuvan. Pokusaj ponovo.",
+    };
   }
 
   if (selectedRows.length) {
@@ -337,11 +439,18 @@ export async function updateWorkerScheduleAction(
       );
 
     if (insertError) {
-      throw new Error("Raspored nije sacuvan. Pokusaj ponovo.");
+      return {
+        status: "error" as const,
+        message: "Raspored nije sacuvan. Pokusaj ponovo.",
+      };
     }
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${worker.id}`);
-  redirect(`/admin/radnici/${worker.id}`);
+  refresh();
+  return {
+    status: "success" as const,
+    message: "Raspored je sacuvan.",
+  };
 }

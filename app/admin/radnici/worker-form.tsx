@@ -1,5 +1,40 @@
+"use client";
+
+import { useActionState } from "react";
+
+type WorkerActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+const initialWorkerActionState: WorkerActionState = {
+  status: "idle",
+  message: "",
+};
+
+function FormMessage({ state }: { state: WorkerActionState }) {
+  if (!state.message) {
+    return null;
+  }
+
+  return (
+    <p
+      className={
+        state.status === "error"
+          ? "text-sm font-medium text-destructive"
+          : "text-sm font-medium text-foreground"
+      }
+    >
+      {state.message}
+    </p>
+  );
+}
+
 type WorkerFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    prevState: WorkerActionState,
+    formData: FormData,
+  ) => Promise<WorkerActionState>;
   submitLabel: string;
   worker?: {
     name: string;
@@ -8,8 +43,13 @@ type WorkerFormProps = {
 };
 
 export function WorkerForm({ action, submitLabel, worker }: WorkerFormProps) {
+  const [state, formAction, pending] = useActionState(
+    action,
+    initialWorkerActionState,
+  );
+
   return (
-    <form action={action} className="space-y-5">
+    <form action={formAction} className="space-y-5">
       <div className="space-y-2">
         <label htmlFor="name" className="text-sm font-medium text-foreground">
           Ime radnika
@@ -38,10 +78,12 @@ export function WorkerForm({ action, submitLabel, worker }: WorkerFormProps) {
 
       <button
         type="submit"
-        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90"
+        disabled={pending}
+        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {submitLabel}
+        {pending ? "Cuvanje..." : submitLabel}
       </button>
+      <FormMessage state={state} />
     </form>
   );
 }
@@ -81,7 +123,10 @@ function formatTime(value: string) {
 }
 
 type WorkerServicesFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    prevState: WorkerActionState,
+    formData: FormData,
+  ) => Promise<WorkerActionState>;
   selectedServiceIds: string[];
   services: WorkerService[];
 };
@@ -91,10 +136,14 @@ export function WorkerServicesForm({
   selectedServiceIds,
   services,
 }: WorkerServicesFormProps) {
+  const [state, formAction, pending] = useActionState(
+    action,
+    initialWorkerActionState,
+  );
   const selectedIds = new Set(selectedServiceIds);
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={formAction} className="space-y-5">
       {services.length ? (
         <div className="divide-y divide-border rounded-md border border-border">
           {services.map((service) => (
@@ -132,17 +181,21 @@ export function WorkerServicesForm({
 
       <button
         type="submit"
-        disabled={!services.length}
+        disabled={!services.length || pending}
         className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Sacuvaj usluge radnika
+        {pending ? "Cuvanje..." : "Sacuvaj usluge radnika"}
       </button>
+      <FormMessage state={state} />
     </form>
   );
 }
 
 type WorkerScheduleFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    prevState: WorkerActionState,
+    formData: FormData,
+  ) => Promise<WorkerActionState>;
   schedules: WorkerSchedule[];
   shifts: WorkerShift[];
 };
@@ -152,12 +205,16 @@ export function WorkerScheduleForm({
   schedules,
   shifts,
 }: WorkerScheduleFormProps) {
+  const [state, formAction, pending] = useActionState(
+    action,
+    initialWorkerActionState,
+  );
   const scheduleByDay = new Map(
     schedules.map((schedule) => [schedule.day_of_week, schedule.shift_id]),
   );
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={formAction} className="space-y-5">
       {shifts.length ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {weekDays.map(([dayIndex, dayName]) => (
@@ -193,11 +250,12 @@ export function WorkerScheduleForm({
 
       <button
         type="submit"
-        disabled={!shifts.length}
+        disabled={!shifts.length || pending}
         className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Sacuvaj raspored
+        {pending ? "Cuvanje..." : "Sacuvaj raspored"}
       </button>
+      <FormMessage state={state} />
     </form>
   );
 }

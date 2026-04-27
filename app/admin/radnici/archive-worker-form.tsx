@@ -1,13 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
+
+type WorkerActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+const initialWorkerActionState: WorkerActionState = {
+  status: "idle",
+  message: "",
+};
 
 type ArchiveWorkerFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    prevState: WorkerActionState,
+    formData: FormData,
+  ) => Promise<WorkerActionState>;
 };
 
 export function ArchiveWorkerForm({ action }: ArchiveWorkerFormProps) {
   const [isConfirming, setIsConfirming] = useState(false);
+  const [state, formAction, pending] = useActionState(
+    action,
+    initialWorkerActionState,
+  );
 
   if (!isConfirming) {
     return (
@@ -22,7 +39,7 @@ export function ArchiveWorkerForm({ action }: ArchiveWorkerFormProps) {
   }
 
   return (
-    <form action={action} className="w-full space-y-3">
+    <form action={formAction} className="w-full space-y-3">
       <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
         <p className="text-sm font-medium text-foreground">
           Arhiviranje trenutno krije radnika iz glavne liste i online
@@ -48,18 +65,31 @@ export function ArchiveWorkerForm({ action }: ArchiveWorkerFormProps) {
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          className="rounded-md border border-destructive/40 px-4 py-2.5 text-sm font-medium text-destructive transition hover:bg-destructive/10"
+          disabled={pending}
+          className="rounded-md border border-destructive/40 px-4 py-2.5 text-sm font-medium text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Potvrdi arhiviranje
+          {pending ? "Cuvanje..." : "Potvrdi arhiviranje"}
         </button>
         <button
           type="button"
+          disabled={pending}
           onClick={() => setIsConfirming(false)}
-          className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent"
+          className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           Odustani
         </button>
       </div>
+      {state.message ? (
+        <p
+          className={
+            state.status === "error"
+              ? "text-sm font-medium text-destructive"
+              : "text-sm font-medium text-foreground"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
     </form>
   );
 }

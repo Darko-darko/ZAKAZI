@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveWorkerForm } from "../archive-worker-form";
+import { WorkerActionForm } from "../worker-action-form";
 import { WorkerPhotoUpload } from "../worker-photo-upload";
 import {
   WorkerForm,
@@ -147,32 +148,25 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
 
           <div className="mt-5 flex flex-wrap gap-3">
             {!worker.archived_at ? (
-              <form
+              <WorkerActionForm
                 action={
                   worker.is_active ? disableOnlineBooking : enableOnlineBooking
                 }
-              >
-                <button
-                  type="submit"
-                  disabled={!worker.is_active && !canEnableOnlineBooking}
-                  className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {worker.is_active
+                disabled={!worker.is_active && !canEnableOnlineBooking}
+                label={
+                  worker.is_active
                     ? "Iskljuci iz online zakazivanja"
-                    : "Ukljuci u online zakazivanje"}
-                </button>
-              </form>
+                    : "Ukljuci u online zakazivanje"
+                }
+              />
             ) : null}
 
             {worker.archived_at ? (
-              <form action={restoreWorker}>
-                <button
-                  type="submit"
-                  className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent"
-                >
-                  Vrati radnika
-                </button>
-              </form>
+              <WorkerActionForm
+                action={restoreWorker}
+                label="Vrati radnika"
+                variant="secondary"
+              />
             ) : (
               <ArchiveWorkerForm action={archiveWorker} />
             )}
