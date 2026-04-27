@@ -57,6 +57,10 @@ function getLoginErrorMessage(message: string | undefined) {
   return "Prijava nije uspela. Proveri email, lozinku i da li je nalog potvrdjen.";
 }
 
+function getAuthOrigin() {
+  return headers().then((headerStore) => headerStore.get("origin") ?? undefined);
+}
+
 export async function loginAction(
   _state: AuthActionState = emptyState,
   formData: FormData,
@@ -84,6 +88,84 @@ export async function loginAction(
   }
 
   redirect(await getPostLoginRedirect(supabase, data.user));
+}
+
+export async function forgotPasswordAction(
+  _state: AuthActionState = emptyState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  void _state;
+
+  const email = readString(formData, "email").toLowerCase();
+
+  if (!email.includes("@") || email.length < 5) {
+    return error("Unesi ispravan email.", { email });
+  }
+
+  const supabase = await createClient();
+  const origin = await getAuthOrigin();
+
+  const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+    email,
+    {
+      redirectTo: origin ? `${origin}/reset-password` : undefined,
+    },
+  );
+
+  if (resetError) {
+    return error("Slanje reset linka nije uspelo. Proveri email i probaj ponovo.", {
+      email,
+    });
+  }
+
+  return {
+    status: "success",
+    message:
+      "Ako nalog postoji, poslali smo email sa linkom za postavljanje nove lozinke.",
+    fields: { email },
+  };
+}
+
+export async function updatePasswordAction(
+  _state: AuthActionState = emptyState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  void _state;
+
+  const password = readString(formData, "password");
+  const confirmPassword = readString(formData, "confirm_password");
+
+  if (password.length < 8) {
+    return error("Lozinka mora imati najmanje 8 karaktera.");
+  }
+
+  if (password !== confirmPassword) {
+    return error("Lozinke se ne poklapaju.");
+  }
+
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) {
+    return error(
+      "Reset link je istekao ili nije validan. Zatrazi novi link za reset lozinke.",
+    );
+  }
+
+  const { error: updateError } = await supabase.auth.updateUser({ password });
+
+  if (updateError) {
+    return error(
+      updateError.message.toLowerCase().includes("weak")
+        ? "Lozinka je preslaba. Koristi najmanje 8 karaktera."
+        : "Lozinka nije promenjena. Zatrazi novi reset link i probaj ponovo.",
+    );
+  }
+
+  await supabase.auth.signOut();
+  redirect(
+    "/login?message=Lozinka%20je%20promenjena.%20Prijavi%20se%20novom%20lozinkom.",
+  );
 }
 
 async function insertProviderWithAvailableSlug({
@@ -216,7 +298,7 @@ export async function registerAction(
   }
 
   const supabase = await createClient();
-  const origin = (await headers()).get("origin") ?? undefined;
+  const origin = await getAuthOrigin();
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email,

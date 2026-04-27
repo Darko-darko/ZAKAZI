@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { loginAction, type AuthActionState } from "@/app/auth/actions";
+import { PasswordInput } from "@/app/auth/password-input";
 
 const initialState: AuthActionState = {
   status: "idle",
   message: "",
 };
 
-export function LoginForm() {
+type LoginFormProps = {
+  notice?: string;
+};
+
+export function LoginForm({ notice }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(
     loginAction,
     initialState,
@@ -32,22 +37,19 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="space-y-2">
-        <label
-          htmlFor="password"
-          className="text-sm font-medium text-foreground"
-        >
-          Lozinka
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-        />
-      </div>
+      <PasswordInput
+        id="password"
+        name="password"
+        label="Lozinka"
+        autoComplete="current-password"
+        required
+      />
+
+      {notice && state.status === "idle" ? (
+        <p className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+          {notice}
+        </p>
+      ) : null}
 
       {state.message ? (
         <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -62,6 +64,12 @@ export function LoginForm() {
       >
         {pending ? "Prijava..." : "Prijavi se"}
       </button>
+
+      <p className="text-center text-sm">
+        <Link href="/forgot-password" className="font-medium text-foreground">
+          Zaboravili ste lozinku?
+        </Link>
+      </p>
 
       <p className="text-center text-sm text-muted-foreground">
         Nemaš nalog?{" "}

@@ -161,8 +161,9 @@ export function RegisterProviderForm() {
             Salon &quot;{state.providerName}&quot; je registrovan
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Diktiraj klijentu lozinku — vidiš je samo jednom. Sledeći put kad
-            bude hteo da uđe, koristi &quot;Zaboravljena lozinka&quot;.
+            Privremenu lozinku vidiš samo jednom. Vlasnik može odmah na /login
+            da izabere &quot;Zaboravili ste lozinku?&quot; i postavi svoju lozinku
+            preko emaila.
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <code className="rounded-md border border-border bg-background px-3 py-2 font-mono text-base font-bold tracking-wider text-foreground">

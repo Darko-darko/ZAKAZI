@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { registerAction, type AuthActionState } from "@/app/auth/actions";
+import { PasswordInput } from "@/app/auth/password-input";
 import { createProviderSlug } from "@/lib/slug";
 
 const initialState: AuthActionState = {
@@ -77,23 +78,14 @@ export function RegisterForm({ refCode = "" }: RegisterFormProps) {
           />
         </div>
 
-        <div className="space-y-2">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-foreground"
-          >
-            Lozinka
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-          />
-        </div>
+        <PasswordInput
+          id="password"
+          name="password"
+          label="Lozinka"
+          autoComplete="new-password"
+          required
+          minLength={8}
+        />
 
         <div className="space-y-2">
           <label htmlFor="phone" className="text-sm font-medium text-foreground">

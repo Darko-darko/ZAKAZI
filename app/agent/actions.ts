@@ -173,7 +173,7 @@ export async function registerProviderForClientAction(
   return {
     status: "success",
     message:
-      "Salon je registrovan. Diktiraj klijentu lozinku — vidis je samo jednom.",
+      "Salon je registrovan. Klijent moze odmah da koristi 'Zaboravili ste lozinku?' na /login za postavljanje svoje lozinke.",
     generatedPassword: password,
     providerSlug: savedSlug,
     providerName,

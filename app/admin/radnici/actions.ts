@@ -278,3 +278,70 @@ export async function updateWorkerServicesAction(
   revalidatePath(`/admin/radnici/${worker.id}`);
   redirect(`/admin/radnici/${worker.id}`);
 }
+
+export async function updateWorkerScheduleAction(
+  workerId: string,
+  formData: FormData,
+) {
+  const { supabase, provider } = await getCurrentProvider();
+
+  const { data: worker } = await supabase
+    .from("workers")
+    .select("id")
+    .eq("id", workerId)
+    .eq("provider_id", provider.id)
+    .maybeSingle();
+
+  if (!worker) {
+    throw new Error("Radnik nije pronadjen.");
+  }
+
+  const selectedRows = Array.from({ length: 7 }, (_, day) => ({
+    day_of_week: day,
+    shift_id: readString(formData, `shift_${day}`),
+  })).filter((row) => row.shift_id);
+
+  if (selectedRows.length) {
+    const selectedShiftIds = Array.from(
+      new Set(selectedRows.map((row) => row.shift_id)),
+    );
+    const { data: shifts, error: shiftsError } = await supabase
+      .from("shifts")
+      .select("id")
+      .eq("provider_id", provider.id)
+      .in("id", selectedShiftIds);
+
+    if (shiftsError || shifts.length !== selectedShiftIds.length) {
+      throw new Error("Raspored nije sacuvan. Izabrana smena nije ispravna.");
+    }
+  }
+
+  const { error: deleteError } = await supabase
+    .from("worker_schedule")
+    .delete()
+    .eq("worker_id", worker.id);
+
+  if (deleteError) {
+    throw new Error("Raspored nije sacuvan. Pokusaj ponovo.");
+  }
+
+  if (selectedRows.length) {
+    const { error: insertError } = await supabase
+      .from("worker_schedule")
+      .insert(
+        selectedRows.map((row) => ({
+          worker_id: worker.id,
+          day_of_week: row.day_of_week,
+          shift_id: row.shift_id,
+        })),
+      );
+
+    if (insertError) {
+      throw new Error("Raspored nije sacuvan. Pokusaj ponovo.");
+    }
+  }
+
+  revalidatePath("/admin/radnici");
+  revalidatePath(`/admin/radnici/${worker.id}`);
+  redirect(`/admin/radnici/${worker.id}`);
+}

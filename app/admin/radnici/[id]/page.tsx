@@ -2,11 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveWorkerForm } from "../archive-worker-form";
 import { WorkerPhotoUpload } from "../worker-photo-upload";
-import { WorkerForm, WorkerServicesForm } from "../worker-form";
+import {
+  WorkerForm,
+  WorkerScheduleForm,
+  WorkerServicesForm,
+} from "../worker-form";
 import {
   archiveWorkerAction,
   restoreWorkerAction,
   setWorkerOnlineBookingAction,
+  updateWorkerScheduleAction,
   updateWorkerAction,
   updateWorkerServicesAction,
 } from "../actions";
@@ -37,6 +42,7 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
 
   const [
     { data: services },
+    { data: shifts },
     { data: workerServices },
     { data: workerSchedules },
   ] = await Promise.all([
@@ -47,17 +53,27 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase
+      .from("shifts")
+      .select("id, name, start_time, end_time")
+      .eq("provider_id", provider.id)
+      .order("start_time", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
       .from("worker_services")
       .select("service_id")
       .eq("worker_id", worker.id),
     supabase
       .from("worker_schedule")
-      .select("id, shift_id")
+      .select("id, day_of_week, shift_id")
       .eq("worker_id", worker.id),
   ]);
 
   const updateWorker = updateWorkerAction.bind(null, worker.id);
   const updateWorkerServices = updateWorkerServicesAction.bind(null, worker.id);
+  const updateWorkerSchedule = updateWorkerScheduleAction.bind(
+    null,
+    worker.id,
+  );
   const archiveWorker = archiveWorkerAction.bind(null, worker.id);
   const restoreWorker = restoreWorkerAction.bind(null, worker.id);
   const enableOnlineBooking = setWorkerOnlineBookingAction.bind(
@@ -193,6 +209,20 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
             selectedServiceIds={
               workerServices?.map((service) => service.service_id) ?? []
             }
+          />
+        </section>
+
+        <section className="rounded-md border border-border bg-card p-6">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold text-foreground">Raspored</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Izaberi smenu za dane kada radnik prima online zakazivanja.
+            </p>
+          </div>
+          <WorkerScheduleForm
+            action={updateWorkerSchedule}
+            schedules={workerSchedules ?? []}
+            shifts={shifts ?? []}
           />
         </section>
       </section>

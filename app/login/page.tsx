@@ -7,7 +7,12 @@ export const metadata = {
   title: "Prijava | zakazi.pro",
 };
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ message?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { message } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
 
@@ -27,7 +32,7 @@ export default async function LoginPage() {
           </p>
         </div>
         <div className="rounded-md border border-border bg-card p-6 text-card-foreground">
-          <LoginForm />
+          <LoginForm notice={message} />
         </div>
       </section>
     </main>
