@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/auth/actions";
+import { ManualBookingFilters } from "@/app/admin/_components/manual-booking-filters";
 import { getCurrentProvider } from "@/lib/admin/provider";
-import { updateBookingStatusAction } from "./actions";
+import {
+  createManualBookingAction,
+  updateBookingStatusAction,
+} from "./actions";
 import {
   StatusActionButton,
   StatusActionCheckbox,
@@ -33,10 +37,24 @@ type RiskMarker = {
   lastSeenAt: string;
 };
 
+type ManualService = {
+  id: string;
+  name: string;
+  duration_minutes: number;
+  price: number | null;
+};
+
+type ManualSlot = {
+  worker_id: string;
+  worker_name: string;
+  starts_at: string;
+  ends_at: string;
+};
+
 const STATUS_LABELS: Record<string, string> = {
   active: "Zakazani",
   confirmed: "Zakazan",
-  completed: "Zavrsen",
+  completed: "Završen",
   cancelled: "Otkazan",
   noshow: "Nije došao",
   expired: "Istekao",
@@ -52,13 +70,15 @@ const ADMIN_LINKS = [
   ["/admin/termini", "Termini"],
   ["/admin/radnici", "Radnici"],
   ["/admin/usluge", "Usluge"],
-  ["/admin/smene", "Smene"],
   ["/admin/radno-vreme", "Radno vreme"],
+  ["/admin/smene", "Smene"],
   ["/admin/raspored", "Raspored"],
+  ["/admin/naplata", "Naplata"],
   ["/admin/sajt", "Mini sajt"],
 ] as const;
 
 const BOOKINGS_OVERVIEW_ID = "dnevni-pregled";
+const MANUAL_ADD_ID = "rucno-dodaj-termin";
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -134,10 +154,17 @@ function isPast(value: string) {
   return new Date(value).getTime() < Date.now();
 }
 
-function buildFilterUrl(params: {
+function buildBookingsUrl(params: {
   date: string;
   worker?: string;
   status?: string;
+  manual?: boolean;
+  manualDate?: string;
+  manualWorker?: string;
+  manualService?: string;
+  manualSlot?: string;
+  manualError?: string;
+  anchor?: string;
 }) {
   const search = new URLSearchParams();
   search.set("date", params.date);
@@ -150,7 +177,44 @@ function buildFilterUrl(params: {
     search.set("status", params.status);
   }
 
-  return `/admin/termini?${search.toString()}#${BOOKINGS_OVERVIEW_ID}`;
+  if (params.manual) {
+    search.set("manual", "1");
+  }
+
+  if (params.manualDate) {
+    search.set("manual_date", params.manualDate);
+  }
+
+  if (params.manualWorker) {
+    search.set("manual_worker", params.manualWorker);
+  }
+
+  if (params.manualService) {
+    search.set("manual_service", params.manualService);
+  }
+
+  if (params.manualSlot) {
+    search.set("manual_slot", params.manualSlot);
+  }
+
+  if (params.manualError) {
+    search.set("manual_error", params.manualError);
+  }
+
+  return `/admin/termini?${search.toString()}${params.anchor ? `#${params.anchor}` : ""}`;
+}
+
+function buildFilterUrl(params: {
+  date: string;
+  worker?: string;
+  status?: string;
+}) {
+  return buildBookingsUrl({
+    date: params.date,
+    worker: params.worker,
+    status: params.status,
+    anchor: BOOKINGS_OVERVIEW_ID,
+  });
 }
 
 export default async function AdminBookingsPage({
@@ -163,6 +227,12 @@ export default async function AdminBookingsPage({
   const selectedDate = firstParam(query.date) ?? today;
   const selectedWorker = firstParam(query.worker) ?? "";
   const selectedStatus = firstParam(query.status) ?? "active";
+  const manualOpen = firstParam(query.manual) === "1";
+  const manualDate = firstParam(query.manual_date) ?? selectedDate;
+  const manualWorker = firstParam(query.manual_worker) ?? "";
+  const manualService = firstParam(query.manual_service) ?? "";
+  const manualSlot = firstParam(query.manual_slot) ?? "";
+  const manualError = firstParam(query.manual_error) ?? "";
   const bounds = dayBounds(selectedDate);
   const todayBounds = dayBounds(today);
   const tomorrowBounds = dayBounds(tomorrow);
@@ -170,8 +240,6 @@ export default async function AdminBookingsPage({
   const [
     { data: workers },
     { count: todayActiveCount },
-    { count: todayCancelledCount },
-    { count: todayAllCount },
     { count: tomorrowActiveCount },
   ] = await Promise.all([
     supabase
@@ -187,20 +255,6 @@ export default async function AdminBookingsPage({
       .gte("starts_at", todayBounds.from)
       .lte("starts_at", todayBounds.to)
       .in("status", ["pending", "confirmed", "noshow"]),
-    supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("provider_id", provider.id)
-      .gte("starts_at", todayBounds.from)
-      .lte("starts_at", todayBounds.to)
-      .eq("status", "cancelled"),
-    supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("provider_id", provider.id)
-      .gte("starts_at", todayBounds.from)
-      .lte("starts_at", todayBounds.to)
-      .neq("status", "expired"),
     supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })
@@ -230,6 +284,30 @@ export default async function AdminBookingsPage({
     bookingsQuery = bookingsQuery.neq("status", "expired");
   } else if (selectedStatus) {
     bookingsQuery = bookingsQuery.eq("status", selectedStatus);
+  }
+
+  let manualServices: ManualService[] = [];
+  if (manualOpen && manualWorker) {
+    const { data } = await supabase.rpc("get_public_services", {
+      p_provider_id: provider.id,
+      p_worker_id: manualWorker,
+    });
+
+    manualServices = (data ?? []) as ManualService[];
+  }
+
+  let manualSlots: ManualSlot[] = [];
+  if (manualOpen && manualWorker && manualService) {
+    const { data } = await supabase.rpc("get_public_slots", {
+      p_provider_id: provider.id,
+      p_service_id: manualService,
+      p_date: manualDate,
+      p_worker_id: manualWorker,
+    });
+
+    manualSlots = ((data ?? []) as ManualSlot[]).slice().sort((a, b) => {
+      return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+    });
   }
 
   const { data: bookings } = await bookingsQuery;
@@ -291,47 +369,77 @@ export default async function AdminBookingsPage({
     });
   }
 
+  const selectedManualWorker = workers?.find((worker) => worker.id === manualWorker);
+  const selectedManualService = manualServices.find(
+    (service) => service.id === manualService,
+  );
+  const selectedManualSlot = manualSlots.find((slot) => slot.starts_at === manualSlot);
+  const manualReadyCount = [
+    manualDate ? 1 : 0,
+    manualWorker ? 1 : 0,
+    manualService ? 1 : 0,
+    manualSlot ? 1 : 0,
+  ].filter(Boolean).length;
+
   const currentPath = buildFilterUrl({
     date: selectedDate,
     worker: selectedWorker,
     status: selectedStatus,
   });
   const filterFormKey = `${selectedDate}:${selectedWorker}:${selectedStatus}`;
+  const manualPanelUrl = buildBookingsUrl({
+    date: selectedDate,
+    worker: selectedWorker,
+    status: selectedStatus,
+    manual: true,
+    manualDate,
+    manualWorker,
+    manualService,
+    manualSlot,
+    anchor: MANUAL_ADD_ID,
+  });
+  const manualCloseUrl = buildBookingsUrl({
+    date: selectedDate,
+    worker: selectedWorker,
+    status: selectedStatus,
+    anchor: BOOKINGS_OVERVIEW_ID,
+  });
 
   return (
     <main className="flex flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-6xl space-y-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Admin panel
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Termini
-              </h1>
-              <span className="inline-flex min-h-8 items-center rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground">
-                Plan: {formatPlanStatus(provider.plan_status)}
-              </span>
+        <header className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                Admin panel
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                  Termini
+                </h1>
+                <span className="inline-flex min-h-8 items-center rounded-full border border-primary/15 bg-primary/8 px-3 text-xs font-semibold text-primary">
+                  Plan: {formatPlanStatus(provider.plan_status)}
+                </span>
+              </div>
+              <p className="mt-2 text-muted-foreground">
+                {provider.name} · zakazi.pro/{provider.slug}
+                {provider.city ? ` · ${provider.city}` : ""}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pregled ko je zakazao, kada, kod koga i za koju uslugu.
+              </p>
             </div>
-            <p className="mt-2 text-muted-foreground">
-              {provider.name} · zakazi.pro/{provider.slug}
-              {provider.city ? ` · ${provider.city}` : ""}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pregled ko je zakazao, kada, kod koga i za koju uslugu.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <form action={logoutAction}>
-              <button className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-foreground">
+            <form action={logoutAction} className="self-start">
+              <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground">
                 Odjavi se
               </button>
             </form>
           </div>
         </header>
 
-        <nav className="flex flex-wrap gap-2">
+        <nav className="rounded-2xl border border-border/70 bg-muted/55 p-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {ADMIN_LINKS.map(([href, label]) => {
             const isActive = href === "/admin/termini";
 
@@ -341,51 +449,34 @@ export default async function AdminBookingsPage({
                 href={href}
                 className={
                   isActive
-                    ? "btn-primary rounded-md px-3 py-2 text-sm font-medium text-primary-foreground"
-                    : "btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground"
+                    ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-sm"
+                    : "inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border/80 bg-background/95 px-3.5 py-2 text-sm font-medium text-foreground transition hover:border-primary/30 hover:bg-background"
                 }
               >
                 {label}
               </Link>
             );
           })}
+          </div>
         </nav>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Link
             href={buildFilterUrl({ date: today, status: "active" })}
-            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
+            className="inline-flex min-h-12 w-full items-center justify-between rounded-xl border border-border/80 bg-warm-soft px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-warm/40"
           >
             <span>Danas</span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
+            <span className="rounded-full border border-warm/30 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
               {todayActiveCount ?? 0}
             </span>
           </Link>
           <Link
-            href={buildFilterUrl({ date: today, status: "cancelled" })}
-            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
-          >
-            <span>Otkazani</span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
-              {todayCancelledCount ?? 0}
-            </span>
-          </Link>
-          <Link
             href={buildFilterUrl({ date: tomorrow, status: "active" })}
-            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
+            className="inline-flex min-h-12 w-full items-center justify-between rounded-xl border border-border/80 bg-brand-soft px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-brand/35"
           >
             <span>Sutra</span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
+            <span className="rounded-full border border-brand/25 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
               {tomorrowActiveCount ?? 0}
-            </span>
-          </Link>
-          <Link
-            href={buildFilterUrl({ date: today, status: "" })}
-            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
-          >
-            <span>Sve danas</span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
-              {todayAllCount ?? 0}
             </span>
           </Link>
         </div>
@@ -409,13 +500,205 @@ export default async function AdminBookingsPage({
               filtere.
             </p>
           </div>
-          <button className="inline-flex min-h-11 items-center justify-center gap-3 self-start rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/15 sm:self-auto">
-            <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              +
-            </span>
-            <span>Ručno dodaj termin</span>
-          </button>
+          {manualOpen ? (
+            <Link
+              href={manualCloseUrl}
+              className="inline-flex min-h-11 items-center justify-center gap-3 self-start rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/15 sm:self-auto"
+            >
+              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                ×
+              </span>
+              <span>Zatvori ručni unos</span>
+            </Link>
+          ) : (
+            <Link
+              href={manualPanelUrl}
+              className="inline-flex min-h-11 items-center justify-center gap-3 self-start rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/15 sm:self-auto"
+            >
+              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                +
+              </span>
+              <span>Ručno dodaj termin</span>
+            </Link>
+          )}
         </header>
+
+        {manualOpen ? (
+          <section
+            id={MANUAL_ADD_ID}
+            className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">
+                  Rucni unos termina
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Izaberi radnika, uslugu i slobodan termin, pa unesi podatke
+                  musterije.
+                </p>
+              </div>
+              <div className="rounded-xl border border-primary/15 bg-primary/6 px-4 py-3 text-sm">
+                <p className="font-semibold text-primary">Tok unosa</p>
+                <p className="mt-1 text-muted-foreground">
+                  Korak {Math.min(manualReadyCount + 1, 4)}/4 · datum, radnik,
+                  usluga, slobodan slot.
+                </p>
+              </div>
+            </div>
+
+            <ManualBookingFilters
+              currentDate={selectedDate}
+              currentWorker={selectedWorker}
+              currentStatus={selectedStatus}
+              manualDate={manualDate}
+              manualWorker={manualWorker}
+              manualService={manualService}
+              services={manualServices}
+              workers={workers ?? []}
+            />
+
+            {manualError ? (
+              <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                {manualError}
+              </div>
+            ) : null}
+
+            {manualWorker && manualService ? (
+              <div className="mt-5 space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Slobodni termini
+                  </h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedManualWorker?.name} · {selectedManualService?.name} ·{" "}
+                    {formatSelectedDate(manualDate)}
+                  </p>
+                </div>
+
+                {manualSlots.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {manualSlots.map((slot) => {
+                      const isActive = slot.starts_at === manualSlot;
+
+                      return (
+                        <Link
+                          key={slot.starts_at}
+                          href={buildBookingsUrl({
+                            date: selectedDate,
+                            worker: selectedWorker,
+                            status: selectedStatus,
+                            manual: true,
+                            manualDate,
+                            manualWorker,
+                            manualService,
+                            manualSlot: slot.starts_at,
+                            anchor: MANUAL_ADD_ID,
+                          })}
+                          className={
+                            isActive
+                              ? "btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-primary-foreground"
+                              : "btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-foreground"
+                          }
+                        >
+                          {formatTime(slot.starts_at)}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                    Nema slobodnih termina za izabrani dan, radnika i uslugu.
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {selectedManualSlot && selectedManualService ? (
+              <form action={createManualBookingAction} className="mt-5 space-y-4">
+                <input type="hidden" name="current_date" value={selectedDate} />
+                <input type="hidden" name="current_worker" value={selectedWorker} />
+                <input type="hidden" name="current_status" value={selectedStatus} />
+                <input type="hidden" name="manual_date" value={manualDate} />
+                <input type="hidden" name="worker_id" value={manualWorker} />
+                <input type="hidden" name="service_id" value={manualService} />
+                <input type="hidden" name="starts_at" value={manualSlot} />
+
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                  <div className="rounded-lg border border-border/70 bg-background p-4">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Novi termin
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">
+                      {selectedManualWorker?.name} · {selectedManualService.name}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {formatSelectedDate(manualDate)} · {formatTime(manualSlot)} do{" "}
+                      {formatTime(selectedManualSlot.ends_at)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-brand/20 bg-brand-soft px-4 py-4">
+                    <p className="text-sm font-semibold text-brand">
+                      Spremno za unos klijenta
+                    </p>
+                    <p className="mt-1 text-sm text-foreground">
+                      Slot ostaje zakljucan u formi ispod da admin ne izgubi izbor.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-2 sm:col-span-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Ime i prezime
+                    </span>
+                    <input
+                      name="client_name"
+                      required
+                      className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Telefon
+                    </span>
+                    <input
+                      name="client_phone"
+                      required
+                      inputMode="tel"
+                      className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      name="client_email"
+                      required
+                      className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </label>
+                  <label className="space-y-2 sm:col-span-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Napomena <span className="text-muted-foreground">(opciono)</span>
+                    </span>
+                    <textarea
+                      name="notes"
+                      rows={3}
+                      className="w-full rounded-md border border-input bg-background px-3 py-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </label>
+                </div>
+
+                <button className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 font-semibold text-primary-foreground">
+                  Sačuvaj termin
+                </button>
+              </form>
+            ) : null}
+          </section>
+        ) : null}
 
         <form
           key={filterFormKey}
@@ -530,7 +813,7 @@ export default async function AdminBookingsPage({
                       </p>
                       {showRisk ? (
                         <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
-                          Ranije nije dosao {risk.count}x. Proveri telefonom pre
+                          Ranije nije došao {risk.count}x. Proveri telefonom pre
                           termina.
                         </p>
                       ) : null}
@@ -542,10 +825,10 @@ export default async function AdminBookingsPage({
                     </div>
                     <div className="rounded-lg bg-background/70 px-3 py-3">
                       <p className="text-sm font-semibold text-foreground">
-                        {booking.workers?.name ?? "Radnik nije pronadjen"}
+                        {booking.workers?.name ?? "Radnik nije pronađen"}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {booking.services?.name ?? "Usluga nije pronadjena"}
+                        {booking.services?.name ?? "Usluga nije pronađena"}
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -600,7 +883,6 @@ export default async function AdminBookingsPage({
             </div>
           )}
         </div>
-
       </section>
     </main>
   );
