@@ -296,6 +296,7 @@ export default async function AdminBookingsPage({
     worker: selectedWorker,
     status: selectedStatus,
   });
+  const filterFormKey = `${selectedDate}:${selectedWorker}:${selectedStatus}`;
 
   return (
     <main className="flex flex-1 px-4 py-6 sm:px-6 sm:py-10">
@@ -322,12 +323,6 @@ export default async function AdminBookingsPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/admin/termini?date=${today}#${BOOKINGS_OVERVIEW_ID}`}
-              className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-foreground"
-            >
-              Danas
-            </Link>
             <form action={logoutAction}>
               <button className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-foreground">
                 Odjavi se
@@ -356,54 +351,42 @@ export default async function AdminBookingsPage({
           })}
         </nav>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-wrap gap-2">
           <Link
             href={buildFilterUrl({ date: today, status: "active" })}
-            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
           >
-            <p className="text-sm text-muted-foreground">Danas</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
+            <span>Danas</span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
               {todayActiveCount ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Zakazani termini za danas
-            </p>
-          </Link>
-          <Link
-            href={buildFilterUrl({ date: today, status: "" })}
-            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
-          >
-            <p className="text-sm text-muted-foreground">Sve danas</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
-              {todayAllCount ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Otvori kompletan dnevni pregled
-            </p>
+            </span>
           </Link>
           <Link
             href={buildFilterUrl({ date: today, status: "cancelled" })}
-            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
           >
-            <p className="text-sm text-muted-foreground">Otkazani danas</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
+            <span>Otkazani</span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
               {todayCancelledCount ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Brz pristup promenama za danas
-            </p>
+            </span>
           </Link>
           <Link
             href={buildFilterUrl({ date: tomorrow, status: "active" })}
-            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
           >
-            <p className="text-sm text-muted-foreground">Sutra</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
+            <span>Sutra</span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
               {tomorrowActiveCount ?? 0}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Zakazani termini za naredni dan
-            </p>
+            </span>
+          </Link>
+          <Link
+            href={buildFilterUrl({ date: today, status: "" })}
+            className="btn-secondary inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground"
+          >
+            <span>Sve danas</span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
+              {todayAllCount ?? 0}
+            </span>
           </Link>
         </div>
 
@@ -426,9 +409,16 @@ export default async function AdminBookingsPage({
               filtere.
             </p>
           </div>
+          <button className="inline-flex min-h-11 items-center justify-center gap-3 self-start rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/15 sm:self-auto">
+            <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+              +
+            </span>
+            <span>Ručno dodaj termin</span>
+          </button>
         </header>
 
         <form
+          key={filterFormKey}
           action="/admin/termini"
           className="grid gap-3 rounded-md border border-border bg-card p-4 sm:grid-cols-[1fr_1fr_1fr_auto]"
         >
