@@ -65,7 +65,9 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
       .eq("worker_id", worker.id),
     supabase
       .from("worker_schedule")
-      .select("id, day_of_week, shift_id")
+      .select(
+        "id, day_of_week, shift_id, custom_start_time, custom_end_time, custom_break_start, custom_break_end",
+      )
       .eq("worker_id", worker.id),
   ]);
 
@@ -89,12 +91,14 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
   );
   const hasServices = Boolean(workerServices?.length);
   const hasSchedule = Boolean(
-    workerSchedules?.some((schedule) => schedule.shift_id),
+    workerSchedules?.some(
+      (schedule) => schedule.shift_id || schedule.custom_start_time,
+    ),
   );
   const canEnableOnlineBooking = hasServices && hasSchedule;
   const missingItems = [
     !hasServices ? "bar jedna usluga" : null,
-    !hasSchedule ? "raspored sa smenom" : null,
+    !hasSchedule ? "raspored sa smenom ili custom vremenom" : null,
   ].filter(Boolean);
 
   return (
@@ -210,7 +214,8 @@ export default async function WorkerEditPage({ params }: WorkerEditPageProps) {
           <div className="mb-5">
             <h2 className="text-xl font-semibold text-foreground">Raspored</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Izaberi smenu za dane kada radnik prima online zakazivanja.
+              Izaberi smenu ili unesi posebno radno vreme za dane kada radnik
+              prima online zakazivanja.
             </p>
           </div>
           <WorkerScheduleForm

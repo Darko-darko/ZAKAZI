@@ -19,6 +19,31 @@ function readNullableString(formData: FormData, key: string) {
   return value || null;
 }
 
+function readNullableTime(formData: FormData, key: string) {
+  return readString(formData, key) || null;
+}
+
+function validateCustomTime(
+  startTime: string | null,
+  endTime: string | null,
+  breakStart: string | null,
+  breakEnd: string | null,
+) {
+  if (!startTime || !endTime || startTime >= endTime) {
+    return "Custom pocetak mora biti pre custom kraja.";
+  }
+
+  if ((breakStart && !breakEnd) || (!breakStart && breakEnd)) {
+    return "Unesi i pocetak i kraj pauze, ili ostavi oba prazna.";
+  }
+
+  if (breakStart && breakEnd && breakStart >= breakEnd) {
+    return "Pocetak pauze mora biti pre kraja pauze.";
+  }
+
+  return null;
+}
+
 export async function createWorkerAction(
   _prevState: WorkerActionState,
   formData: FormData,
@@ -138,14 +163,14 @@ export async function setWorkerOnlineBookingAction(
         .from("worker_schedule")
         .select("id")
         .eq("worker_id", worker.id)
-        .not("shift_id", "is", null)
+        .or("shift_id.not.is.null,custom_start_time.not.is.null")
         .limit(1),
     ]);
 
     if (!services?.length || !schedules?.length) {
       return {
         status: "error" as const,
-        message: "Radniku nedostaju usluge ili raspored.",
+                message: "Radniku nedostaju usluge ili raspored.",
       };
     }
   }
@@ -392,26 +417,84 @@ export async function updateWorkerScheduleAction(
     };
   }
 
-  const selectedRows = Array.from({ length: 7 }, (_, day) => ({
-    day_of_week: day,
-    shift_id: readString(formData, `shift_${day}`),
-  })).filter((row) => row.shift_id);
+  const selectedRows = [];
+
+  for (let day = 0; day < 7; day += 1) {
+    const mode = readString(formData, `mode_${day}`);
+
+    if (mode === "shift") {
+      const shiftId = readString(formData, `shift_${day}`);
+
+      if (shiftId) {
+        selectedRows.push({
+          day_of_week: day,
+          shift_id: shiftId,
+          custom_start_time: null,
+          custom_end_time: null,
+          custom_break_start: null,
+          custom_break_end: null,
+        });
+      }
+    }
+
+    if (mode === "custom") {
+      const customStart = readNullableTime(formData, `custom_start_${day}`);
+      const customEnd = readNullableTime(formData, `custom_end_${day}`);
+      const customBreakStart = readNullableTime(
+        formData,
+        `custom_break_start_${day}`,
+      );
+      const customBreakEnd = readNullableTime(
+        formData,
+        `custom_break_end_${day}`,
+      );
+      const validationError = validateCustomTime(
+        customStart,
+        customEnd,
+        customBreakStart,
+        customBreakEnd,
+      );
+
+      if (validationError) {
+        return {
+          status: "error" as const,
+          message: validationError,
+        };
+      }
+
+      selectedRows.push({
+        day_of_week: day,
+        shift_id: null,
+        custom_start_time: customStart,
+        custom_end_time: customEnd,
+        custom_break_start: customBreakStart,
+        custom_break_end: customBreakEnd,
+      });
+    }
+  }
 
   if (selectedRows.length) {
     const selectedShiftIds = Array.from(
-      new Set(selectedRows.map((row) => row.shift_id)),
+      new Set(
+        selectedRows
+          .map((row) => row.shift_id)
+          .filter((shiftId): shiftId is string => Boolean(shiftId)),
+      ),
     );
-    const { data: shifts, error: shiftsError } = await supabase
-      .from("shifts")
-      .select("id")
-      .eq("provider_id", provider.id)
-      .in("id", selectedShiftIds);
 
-    if (shiftsError || !shifts || shifts.length !== selectedShiftIds.length) {
-      return {
-        status: "error" as const,
-        message: "Raspored nije sacuvan. Izabrana smena nije ispravna.",
-      };
+    if (selectedShiftIds.length) {
+      const { data: shifts, error: shiftsError } = await supabase
+        .from("shifts")
+        .select("id")
+        .eq("provider_id", provider.id)
+        .in("id", selectedShiftIds);
+
+      if (shiftsError || !shifts || shifts.length !== selectedShiftIds.length) {
+        return {
+          status: "error" as const,
+          message: "Raspored nije sacuvan. Izabrana smena nije ispravna.",
+        };
+      }
     }
   }
 
@@ -423,7 +506,7 @@ export async function updateWorkerScheduleAction(
   if (deleteError) {
     return {
       status: "error" as const,
-      message: "Raspored nije sacuvan. Pokusaj ponovo.",
+      message: `Raspored nije sacuvan: ${deleteError.message}`,
     };
   }
 
@@ -435,20 +518,23 @@ export async function updateWorkerScheduleAction(
           worker_id: worker.id,
           day_of_week: row.day_of_week,
           shift_id: row.shift_id,
+          custom_start_time: row.custom_start_time,
+          custom_end_time: row.custom_end_time,
+          custom_break_start: row.custom_break_start,
+          custom_break_end: row.custom_break_end,
         })),
       );
 
     if (insertError) {
       return {
         status: "error" as const,
-        message: "Raspored nije sacuvan. Pokusaj ponovo.",
+        message: `Raspored nije sacuvan: ${insertError.message}`,
       };
     }
   }
 
   revalidatePath("/admin/radnici");
   revalidatePath(`/admin/radnici/${worker.id}`);
-  refresh();
   return {
     status: "success" as const,
     message: "Raspored je sacuvan.",

@@ -506,6 +506,26 @@ export async function onboardingAction(
     }
   }
 
+  const workingHourRows = Array.from({ length: 7 }, (_, day) => {
+    const isWorkDay = workDays.includes(String(day));
+
+    return {
+      provider_id: providerId,
+      day_of_week: day,
+      opens_at: isWorkDay ? startTime : null,
+      closes_at: isWorkDay ? endTime : null,
+      is_closed: !isWorkDay,
+    };
+  });
+
+  const { error: workingHoursError } = await supabase
+    .from("provider_working_hours")
+    .upsert(workingHourRows, { onConflict: "provider_id,day_of_week" });
+
+  if (workingHoursError) {
+    return error("Raspored je sacuvan, ali radno vreme nije sacuvano.", fields);
+  }
+
   redirect("/admin");
 }
 

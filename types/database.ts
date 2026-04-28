@@ -387,6 +387,41 @@ export type Database = {
           },
         ]
       }
+      provider_working_hours: {
+        Row: {
+          closes_at: string | null
+          day_of_week: number
+          id: string
+          is_closed: boolean
+          opens_at: string | null
+          provider_id: string
+        }
+        Insert: {
+          closes_at?: string | null
+          day_of_week: number
+          id?: string
+          is_closed?: boolean
+          opens_at?: string | null
+          provider_id: string
+        }
+        Update: {
+          closes_at?: string | null
+          day_of_week?: number
+          id?: string
+          is_closed?: boolean
+          opens_at?: string | null
+          provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_working_hours_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       providers: {
         Row: {
           address: string | null
@@ -514,6 +549,10 @@ export type Database = {
       }
       schedule_overrides: {
         Row: {
+          custom_break_end: string | null
+          custom_break_start: string | null
+          custom_end_time: string | null
+          custom_start_time: string | null
           date: string
           id: string
           reason: string | null
@@ -521,6 +560,10 @@ export type Database = {
           worker_id: string
         }
         Insert: {
+          custom_break_end?: string | null
+          custom_break_start?: string | null
+          custom_end_time?: string | null
+          custom_start_time?: string | null
           date: string
           id?: string
           reason?: string | null
@@ -528,6 +571,10 @@ export type Database = {
           worker_id: string
         }
         Update: {
+          custom_break_end?: string | null
+          custom_break_start?: string | null
+          custom_end_time?: string | null
+          custom_start_time?: string | null
           date?: string
           id?: string
           reason?: string | null
@@ -762,18 +809,30 @@ export type Database = {
       }
       worker_schedule: {
         Row: {
+          custom_break_end: string | null
+          custom_break_start: string | null
+          custom_end_time: string | null
+          custom_start_time: string | null
           day_of_week: number
           id: string
           shift_id: string | null
           worker_id: string
         }
         Insert: {
+          custom_break_end?: string | null
+          custom_break_start?: string | null
+          custom_end_time?: string | null
+          custom_start_time?: string | null
           day_of_week: number
           id?: string
           shift_id?: string | null
           worker_id: string
         }
         Update: {
+          custom_break_end?: string | null
+          custom_break_start?: string | null
+          custom_end_time?: string | null
+          custom_start_time?: string | null
           day_of_week?: number
           id?: string
           shift_id?: string | null

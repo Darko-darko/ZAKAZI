@@ -91,7 +91,7 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <Link
             href="/admin/termini"
             className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
@@ -125,7 +125,25 @@ export default async function AdminPage() {
           >
             <h2 className="font-semibold text-foreground">Smene</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Radno vreme i raspored.
+              Sabloni jutarnjih i popodnevnih smena.
+            </p>
+          </Link>
+          <Link
+            href="/admin/radno-vreme"
+            className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
+          >
+            <h2 className="font-semibold text-foreground">Radno vreme</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Kada nalog prima online termine.
+            </p>
+          </Link>
+          <Link
+            href="/admin/raspored"
+            className="rounded-md border border-border bg-card p-5 transition hover:bg-accent"
+          >
+            <h2 className="font-semibold text-foreground">Raspored</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ubacivanje radnika u smene.
             </p>
           </Link>
           <Link

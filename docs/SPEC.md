@@ -161,6 +161,20 @@ provider_gallery
   created_at timestamptz default now()
 ```
 
+### Radno vreme providera
+
+```sql
+provider_working_hours
+  id uuid PK
+  provider_id uuid FK → providers
+  day_of_week int NOT NULL               -- 0=ned ... 6=sub
+  opens_at time
+  closes_at time
+  is_closed bool default false
+```
+
+> Radno vreme providera je okvir u kom ordinacija/salon prima termine. Smene i custom radno vreme radnika moraju biti unutar tog okvira, osim ako admin eksplicitno potvrdi izuzetak.
+
 ### Smene
 
 ```sql
@@ -196,7 +210,18 @@ worker_schedule
   worker_id uuid FK → workers
   day_of_week int NOT NULL               -- 0=ned ... 6=sub
   shift_id uuid FK → shifts              -- null = ne radi
+  custom_start_time time                 -- ako radnik taj dan radi van šablona smene
+  custom_end_time time
+  custom_break_start time
+  custom_break_end time
 ```
+
+> Raspored podržava dva režima po radniku/danu:
+> - `shift_id` popunjen → radnik radi po definisanoj smeni
+> - `custom_start_time` + `custom_end_time` popunjeni → radnik ima posebno radno vreme za taj dan u nedelji
+> - sve null → radnik ne radi taj dan
+>
+> Custom vreme služi za situacije tipa: "Marko utorkom radi 10:00-16:00", bez pravljenja posebne smene samo za njega.
 
 ### Shift rotations
 
@@ -225,8 +250,19 @@ schedule_overrides
   worker_id uuid FK → workers
   date date NOT NULL
   shift_id uuid FK → shifts              -- null = ne radi taj dan
+  custom_start_time time                 -- ručno vreme za konkretan datum
+  custom_end_time time
+  custom_break_start time
+  custom_break_end time
   reason text
 ```
+
+> Override za konkretan datum ima isti princip kao nedeljni raspored:
+> - može izabrati postojeću smenu
+> - može uneti custom vreme
+> - može označiti da radnik ne radi taj dan
+>
+> Primeri: "Ana 2026-05-15 radi 12:00-18:00", "Petar 2026-05-20 ne radi", "Milica 2026-05-21 prelazi u drugu smenu".
 
 ### Time off (godišnji, praznici, ad-hoc)
 
@@ -438,7 +474,8 @@ Super Admin **ne koristi RLS** — koristi `service_role` key sa servera (`lib/s
 | `/admin/usluge/[id]` | Uređivanje |
 | `/admin/smene` | Lista smena |
 | `/admin/smene/nova` | Kreiranje smene |
-| `/admin/raspored` | Nedeljni raspored + rotacije + override |
+| `/admin/radno-vreme` | Radno vreme ordinacije/salona po danima |
+| `/admin/raspored` | Nedeljni raspored radnika: smene, custom vreme, rotacije + override |
 | `/admin/blokade` | Blokiranje vremena |
 | `/admin/sajt` | Live preview + uređivanje |
 | `/admin/sajt/brending` | Boje, font, logo, cover |
@@ -531,14 +568,19 @@ Super admin može promeniti `provider.agent_commission_percent` u svakom trenutk
 ### Slobodni termini (slot logika)
 
 ```
-1. Radno vreme radnika za taj dan:
+1. Proveri radno vreme providera za taj dan:
+   provider_working_hours.is_closed = true → nema termina
+2. Radno vreme radnika za taj dan:
    schedule_override > shift_rotation > worker_schedule (prioritet)
-2. Oduzmi break_start/break_end
-3. Oduzmi buffer_minutes između termina
-4. Oduzmi bookinge (status: confirmed, pending)
-5. Oduzmi time_off
-6. Korak slota = trajanje izabrane usluge, poravnato sa početkom svakog slobodnog bloka (početak smene, kraj pauze, kraj postojećeg termina + buffer)
-7. Ne prikazuj: prošlost, < min_notice, > max_days_ahead
+3. Ako izvor rasporeda ima shift_id → koristi start/end/break iz shifts
+4. Ako izvor rasporeda ima custom_start_time/custom_end_time → koristi custom vreme i custom pauzu
+5. Presek radnog vremena radnika sa radnim vremenom providera
+6. Oduzmi break_start/break_end
+7. Oduzmi buffer_minutes između termina
+8. Oduzmi bookinge (status: confirmed, pending)
+9. Oduzmi time_off
+10. Korak slota = trajanje izabrane usluge, poravnato sa početkom svakog slobodnog bloka (početak smene/custom vremena, kraj pauze, kraj postojećeg termina + buffer)
+11. Ne prikazuj: prošlost, < min_notice, > max_days_ahead
 ```
 
 ### Race condition zaštita
