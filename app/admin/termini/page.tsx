@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { logoutAction } from "@/app/auth/actions";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { updateBookingStatusAction } from "./actions";
 import {
@@ -35,7 +36,7 @@ type RiskMarker = {
 const STATUS_LABELS: Record<string, string> = {
   active: "Zakazani",
   confirmed: "Zakazan",
-  completed: "Završen",
+  completed: "Zavrsen",
   cancelled: "Otkazan",
   noshow: "Nije došao",
   expired: "Istekao",
@@ -46,6 +47,18 @@ const STATUS_FILTERS = [
   ["cancelled", "Otkazani"],
   ["", "Svi statusi"],
 ] as const;
+
+const ADMIN_LINKS = [
+  ["/admin/termini", "Termini"],
+  ["/admin/radnici", "Radnici"],
+  ["/admin/usluge", "Usluge"],
+  ["/admin/smene", "Smene"],
+  ["/admin/radno-vreme", "Radno vreme"],
+  ["/admin/raspored", "Raspored"],
+  ["/admin/sajt", "Mini sajt"],
+] as const;
+
+const BOOKINGS_OVERVIEW_ID = "dnevni-pregled";
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -67,19 +80,46 @@ function dayBounds(date: string) {
   };
 }
 
-function formatDateTime(value: string) {
+function shiftDate(date: string, days: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day));
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function formatTime(value: string) {
   return new Intl.DateTimeFormat("sr-Latn-RS", {
     timeZone: "Europe/Belgrade",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
 }
 
+function formatSelectedDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    timeZone: "Europe/Belgrade",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 function statusLabel(status: string) {
   return STATUS_LABELS[status] ?? status;
+}
+
+function formatPlanStatus(status: string) {
+  if (!status) {
+    return "Plan nije postavljen";
+  }
+
+  return status
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function StatusMarker({ status }: { status: string }) {
@@ -106,11 +146,11 @@ function buildFilterUrl(params: {
     search.set("worker", params.worker);
   }
 
-  if (params.status) {
+  if (params.status !== undefined) {
     search.set("status", params.status);
   }
 
-  return `/admin/termini?${search.toString()}`;
+  return `/admin/termini?${search.toString()}#${BOOKINGS_OVERVIEW_ID}`;
 }
 
 export default async function AdminBookingsPage({
@@ -118,17 +158,57 @@ export default async function AdminBookingsPage({
 }: AdminBookingsPageProps) {
   const query = await searchParams;
   const { supabase, provider } = await getCurrentProvider();
-  const selectedDate = firstParam(query.date) ?? todayInBelgrade();
+  const today = todayInBelgrade();
+  const tomorrow = shiftDate(today, 1);
+  const selectedDate = firstParam(query.date) ?? today;
   const selectedWorker = firstParam(query.worker) ?? "";
   const selectedStatus = firstParam(query.status) ?? "active";
   const bounds = dayBounds(selectedDate);
+  const todayBounds = dayBounds(today);
+  const tomorrowBounds = dayBounds(tomorrow);
 
-  const { data: workers } = await supabase
-    .from("workers")
-    .select("id, name")
-    .eq("provider_id", provider.id)
-    .is("archived_at", null)
-    .order("created_at");
+  const [
+    { data: workers },
+    { count: todayActiveCount },
+    { count: todayCancelledCount },
+    { count: todayAllCount },
+    { count: tomorrowActiveCount },
+  ] = await Promise.all([
+    supabase
+      .from("workers")
+      .select("id, name")
+      .eq("provider_id", provider.id)
+      .is("archived_at", null)
+      .order("created_at"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .gte("starts_at", todayBounds.from)
+      .lte("starts_at", todayBounds.to)
+      .in("status", ["pending", "confirmed", "noshow"]),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .gte("starts_at", todayBounds.from)
+      .lte("starts_at", todayBounds.to)
+      .eq("status", "cancelled"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .gte("starts_at", todayBounds.from)
+      .lte("starts_at", todayBounds.to)
+      .neq("status", "expired"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("provider_id", provider.id)
+      .gte("starts_at", tomorrowBounds.from)
+      .lte("starts_at", tomorrowBounds.to)
+      .in("status", ["pending", "confirmed", "noshow"]),
+  ]);
 
   let bookingsQuery = supabase
     .from("bookings")
@@ -210,6 +290,7 @@ export default async function AdminBookingsPage({
           : current.lastSeenAt,
     });
   }
+
   const currentPath = buildFilterUrl({
     date: selectedDate,
     worker: selectedWorker,
@@ -221,25 +302,130 @@ export default async function AdminBookingsPage({
       <section className="mx-auto w-full max-w-6xl space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Nazad na admin
-            </Link>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              Termini
-            </h1>
-            <p className="mt-1 text-muted-foreground">
+            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Admin panel
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Termini
+              </h1>
+              <span className="inline-flex min-h-8 items-center rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground">
+                Plan: {formatPlanStatus(provider.plan_status)}
+              </span>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              {provider.name} · zakazi.pro/{provider.slug}
+              {provider.city ? ` · ${provider.city}` : ""}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
               Pregled ko je zakazao, kada, kod koga i za koju uslugu.
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/admin/termini?date=${today}#${BOOKINGS_OVERVIEW_ID}`}
+              className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-foreground"
+            >
+              Danas
+            </Link>
+            <form action={logoutAction}>
+              <button className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-foreground">
+                Odjavi se
+              </button>
+            </form>
+          </div>
+        </header>
+
+        <nav className="flex flex-wrap gap-2">
+          {ADMIN_LINKS.map(([href, label]) => {
+            const isActive = href === "/admin/termini";
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={
+                  isActive
+                    ? "btn-primary rounded-md px-3 py-2 text-sm font-medium text-primary-foreground"
+                    : "btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground"
+                }
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Link
-            href={`/admin/termini?date=${todayInBelgrade()}`}
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 text-sm font-semibold text-foreground transition hover:bg-accent"
+            href={buildFilterUrl({ date: today, status: "active" })}
+            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
           >
-            Danas
+            <p className="text-sm text-muted-foreground">Danas</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {todayActiveCount ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Zakazani termini za danas
+            </p>
           </Link>
+          <Link
+            href={buildFilterUrl({ date: today, status: "" })}
+            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+          >
+            <p className="text-sm text-muted-foreground">Sve danas</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {todayAllCount ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Otvori kompletan dnevni pregled
+            </p>
+          </Link>
+          <Link
+            href={buildFilterUrl({ date: today, status: "cancelled" })}
+            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+          >
+            <p className="text-sm text-muted-foreground">Otkazani danas</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {todayCancelledCount ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Brz pristup promenama za danas
+            </p>
+          </Link>
+          <Link
+            href={buildFilterUrl({ date: tomorrow, status: "active" })}
+            className="rounded-md border border-border bg-card p-4 transition hover:border-ring/40 hover:bg-accent"
+          >
+            <p className="text-sm text-muted-foreground">Sutra</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {tomorrowActiveCount ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Zakazani termini za naredni dan
+            </p>
+          </Link>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Filtriraj pregled
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fokus ostaje na dnevnom radu: datum, radnik i status u dva klika.
+          </p>
+        </div>
+
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div id={BOOKINGS_OVERVIEW_ID}>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              Dnevni pregled
+            </h2>
+            <p className="mt-1 text-muted-foreground">
+              {formatSelectedDate(selectedDate)} · prikaz za izabrani datum i
+              filtere.
+            </p>
+          </div>
         </header>
 
         <form
@@ -284,94 +470,92 @@ export default async function AdminBookingsPage({
               ))}
             </select>
           </label>
-          <button className="min-h-11 self-end rounded-md bg-primary px-4 font-semibold text-primary-foreground transition hover:opacity-90">
+          <button className="btn-primary min-h-11 self-end rounded-md px-4 font-semibold text-primary-foreground">
             Prikaži
           </button>
         </form>
 
-        <div className="overflow-hidden rounded-md border border-border bg-card">
+        <div className="space-y-3">
           {rows.length ? (
-            <div className="divide-y divide-border">
-              {rows.map((booking) => {
-                const phoneRisk = riskByPhone.get(booking.client_phone);
-                const emailRisk = booking.client_email
-                  ? riskByEmail.get(booking.client_email)
-                  : undefined;
-                const risk =
-                  phoneRisk && emailRisk
-                    ? {
-                        count: Math.max(phoneRisk.count, emailRisk.count),
-                        lastSeenAt:
-                          phoneRisk.lastSeenAt > emailRisk.lastSeenAt
-                            ? phoneRisk.lastSeenAt
-                            : emailRisk.lastSeenAt,
-                      }
-                    : phoneRisk ?? emailRisk;
-                const showRisk =
-                  booking.status === "confirmed" &&
-                  risk &&
-                  risk.lastSeenAt < booking.starts_at;
-                const canMarkNoShow =
-                  booking.status === "confirmed" && isPast(booking.starts_at);
-                const canCancel =
-                  booking.status === "confirmed" && !isPast(booking.starts_at);
-                const markNoShow = updateBookingStatusAction.bind(
-                  null,
-                  booking.id,
-                  "noshow",
-                );
-                const cancelBooking = updateBookingStatusAction.bind(
-                  null,
-                  booking.id,
-                  "cancelled",
-                );
-                const undoNoShow = updateBookingStatusAction.bind(
-                  null,
-                  booking.id,
-                  "confirmed",
-                );
+            rows.map((booking) => {
+              const phoneRisk = riskByPhone.get(booking.client_phone);
+              const emailRisk = booking.client_email
+                ? riskByEmail.get(booking.client_email)
+                : undefined;
+              const risk =
+                phoneRisk && emailRisk
+                  ? {
+                      count: Math.max(phoneRisk.count, emailRisk.count),
+                      lastSeenAt:
+                        phoneRisk.lastSeenAt > emailRisk.lastSeenAt
+                          ? phoneRisk.lastSeenAt
+                          : emailRisk.lastSeenAt,
+                    }
+                  : phoneRisk ?? emailRisk;
+              const showRisk =
+                booking.status === "confirmed" &&
+                risk &&
+                risk.lastSeenAt < booking.starts_at;
+              const canMarkNoShow =
+                booking.status === "confirmed" && isPast(booking.starts_at);
+              const canCancel =
+                booking.status === "confirmed" && !isPast(booking.starts_at);
+              const markNoShow = updateBookingStatusAction.bind(
+                null,
+                booking.id,
+                "noshow",
+              );
+              const cancelBooking = updateBookingStatusAction.bind(
+                null,
+                booking.id,
+                "cancelled",
+              );
+              const undoNoShow = updateBookingStatusAction.bind(
+                null,
+                booking.id,
+                "confirmed",
+              );
 
-                return (
-                  <article
-                    key={booking.id}
-                    className="grid gap-3 p-4 sm:grid-cols-[10rem_1fr_12rem_10rem]"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {formatDateTime(booking.starts_at)}
+              return (
+                <article
+                  key={booking.id}
+                  className="rounded-xl border border-border bg-card p-4 shadow-sm"
+                >
+                  <div className="grid gap-4 lg:grid-cols-[8rem_minmax(0,1fr)_12rem_10rem]">
+                    <div className="rounded-lg border border-border/70 bg-background px-3 py-3">
+                      <p className="text-3xl font-bold leading-none text-foreground">
+                        {formatTime(booking.starts_at)}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        do {formatDateTime(booking.ends_at).split(", ").pop()}
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        do {formatTime(booking.ends_at)}
                       </p>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-semibold text-foreground">
                         {booking.client_name}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {booking.client_phone}
-                        {booking.client_email
-                          ? ` · ${booking.client_email}`
-                          : ""}
+                        {booking.client_email ? ` · ${booking.client_email}` : ""}
                       </p>
                       {showRisk ? (
-                        <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
-                          Ranije nije došao {risk.count}x. Proveri telefonom pre
+                        <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                          Ranije nije dosao {risk.count}x. Proveri telefonom pre
                           termina.
                         </p>
                       ) : null}
                       {booking.notes ? (
-                        <p className="mt-2 text-sm text-muted-foreground">
+                        <p className="mt-3 text-sm text-muted-foreground">
                           {booking.notes}
                         </p>
                       ) : null}
                     </div>
-                    <div>
+                    <div className="rounded-lg bg-background/70 px-3 py-3">
                       <p className="text-sm font-semibold text-foreground">
-                        {booking.workers?.name ?? "Radnik nije pronađen"}
+                        {booking.workers?.name ?? "Radnik nije pronadjen"}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {booking.services?.name ?? "Usluga nije pronađena"}
+                        {booking.services?.name ?? "Usluga nije pronadjena"}
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -416,35 +600,17 @@ export default async function AdminBookingsPage({
                         </form>
                       ) : null}
                     </div>
-                  </article>
-                );
-              })}
-            </div>
+                  </div>
+                </article>
+              );
+            })
           ) : (
-            <div className="p-6 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
               Nema termina za izabrane filtere.
             </div>
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          {workers?.map((worker) => (
-            <Link
-              key={worker.id}
-              href={buildFilterUrl({
-                date: selectedDate,
-                worker: worker.id,
-                status: selectedStatus,
-              })}
-              className="rounded-md border border-border bg-card p-4 transition hover:bg-accent"
-            >
-              <p className="font-semibold text-foreground">{worker.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Prikaži samo njegove termine
-              </p>
-            </Link>
-          ))}
-        </div>
       </section>
     </main>
   );
