@@ -12,7 +12,7 @@ export async function getCurrentProvider() {
   const { data: provider } = await supabase
     .from("providers")
     .select(
-      "id, user_id, name, slug, city, plan, plan_status, trial_ends_at, plan_expires_at",
+      "id, user_id, name, slug, city, plan, plan_status, trial_ends_at, plan_expires_at, billing_email",
     )
     .eq("user_id", userData.user.id)
     .maybeSingle();
