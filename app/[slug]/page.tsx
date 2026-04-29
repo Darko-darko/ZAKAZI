@@ -78,6 +78,22 @@ function getInitials(name: string) {
     .join("");
 }
 
+function normalizeCoverFocalY(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return 50;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function normalizeCoverFocalX(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return 50;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 function todayInBelgrade() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Belgrade",
@@ -143,6 +159,8 @@ export default async function PublicProviderPage({
   const heroImage = provider.cover_url ?? gallery?.[0]?.image_url ?? null;
   const heroText = provider.intro_text;
   const theme = getThemeClasses(provider.site_theme);
+  const coverFocalX = normalizeCoverFocalX(provider.cover_focal_x);
+  const coverFocalY = normalizeCoverFocalY(provider.cover_focal_y);
 
   return (
     <main
@@ -161,6 +179,7 @@ export default async function PublicProviderPage({
             src={heroImage}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: `${coverFocalX}% ${coverFocalY}%` }}
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/65" />

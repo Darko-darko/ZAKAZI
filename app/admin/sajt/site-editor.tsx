@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ShareSiteButton } from "./share-site-button";
 import {
@@ -28,6 +28,8 @@ type SiteEditorProvider = {
   phone: string | null;
   logo_url: string | null;
   cover_url: string | null;
+  cover_focal_x: number;
+  cover_focal_y: number;
   primary_color: string;
   text_color: string;
   font_choice: string;
@@ -133,6 +135,34 @@ function formatPrice(price: number | null) {
   return `${price.toLocaleString("sr-RS")} RSD`;
 }
 
+function normalizeCoverFocalY(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function normalizeCoverFocalX(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function getCoverDragMetrics(
+  frameWidth: number,
+  frameHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  if (frameWidth <= 0 || frameHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return { overflowX: 0, overflowY: 0 };
+  }
+
+  const scale = Math.max(frameWidth / imageWidth, frameHeight / imageHeight);
+  const renderedWidth = imageWidth * scale;
+  const renderedHeight = imageHeight * scale;
+
+  return {
+    overflowX: Math.max(0, renderedWidth - frameWidth),
+    overflowY: Math.max(0, renderedHeight - frameHeight),
+  };
+}
+
 const initialState: SiteBrandingState = {
   ok: false,
   message: "",
@@ -174,6 +204,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   );
   const [isUploading, startUploadTransition] = useTransition();
   const [assetMessage, setAssetMessage] = useState("");
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     name: provider.name,
     intro_text: provider.intro_text ?? "",
@@ -183,6 +214,8 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
     phone: provider.phone ?? "",
     logo_url: provider.logo_url,
     cover_url: provider.cover_url,
+    cover_focal_x: normalizeCoverFocalX(provider.cover_focal_x),
+    cover_focal_y: normalizeCoverFocalY(provider.cover_focal_y),
     primary_color: provider.primary_color,
     text_color: provider.text_color,
     font_choice: (["default", "serif", "modern", "elegant"].includes(
@@ -199,6 +232,14 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
+  useEffect(() => {
+    return () => {
+      if (coverPreviewUrl) {
+        URL.revokeObjectURL(coverPreviewUrl);
+      }
+    };
+  }, [coverPreviewUrl]);
+
   function uploadAsset(kind: AssetKind, file: File) {
     setAssetMessage("");
 
@@ -210,6 +251,17 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
     if (file.size > maxFileSize) {
       setAssetMessage("Slika moze biti najvise 5 MB.");
       return;
+    }
+
+    if (kind === "cover") {
+      const nextPreviewUrl = URL.createObjectURL(file);
+      setCoverPreviewUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+
+        return nextPreviewUrl;
+      });
     }
 
     startUploadTransition(async () => {
@@ -252,6 +304,21 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   function removeAsset(kind: AssetKind) {
     setAssetMessage("");
 
+    if (kind === "cover") {
+      setCoverPreviewUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+
+        return null;
+      });
+      setDraft((current) => ({
+        ...current,
+        cover_focal_x: 50,
+        cover_focal_y: 50,
+      }));
+    }
+
     startUploadTransition(async () => {
       try {
         const result = await updateSiteAssetAction(kind, null);
@@ -265,8 +332,18 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   }
 
   return (
-    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+    <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(24rem,28rem)] xl:items-start xl:gap-10">
       <form action={formAction} className="min-w-0 space-y-6">
+        <input
+          type="hidden"
+          name="cover_focal_x"
+          value={draft.cover_focal_x}
+        />
+        <input
+          type="hidden"
+          name="cover_focal_y"
+          value={draft.cover_focal_y}
+        />
         <section className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-sm shadow-black/5">
           <div className="border-b border-border/60 bg-gradient-to-r from-brand-soft/65 via-background to-warm-soft/55 px-5 py-4 sm:px-6">
             <div className="inline-flex items-center rounded-full border border-brand/15 bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand shadow-sm shadow-brand/5">
@@ -564,8 +641,8 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
               inputRef={coverInputRef}
               isUploading={isUploading}
               label="Cover fotografija"
-              url={draft.cover_url}
-              wide
+              url={coverPreviewUrl ?? draft.cover_url}
+              isCover
               onRemove={() => removeAsset("cover")}
               onUpload={(file) => uploadAsset("cover", file)}
             />
@@ -601,7 +678,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
         </div>
       </form>
 
-      <aside className="lg:sticky lg:top-6">
+      <aside className="xl:sticky xl:top-6 xl:pl-2">
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">Preview</h2>
           <ShareSiteButton
@@ -617,6 +694,19 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
             services={services}
             slug={provider.slug}
             workers={workers}
+            previewCoverUrl={coverPreviewUrl}
+            onCoverFocalXChange={(nextValue) =>
+              setDraft((current) => ({
+                ...current,
+                cover_focal_x: normalizeCoverFocalX(nextValue),
+              }))
+            }
+            onCoverFocalYChange={(nextValue) =>
+              setDraft((current) => ({
+                ...current,
+                cover_focal_y: normalizeCoverFocalY(nextValue),
+              }))
+            }
           />
         </div>
       </aside>
@@ -631,7 +721,7 @@ function AssetUploader({
   onRemove,
   onUpload,
   url,
-  wide = false,
+  isCover = false,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   isUploading: boolean;
@@ -639,27 +729,40 @@ function AssetUploader({
   onRemove: () => void;
   onUpload: (file: File) => void;
   url: string | null;
-  wide?: boolean;
+  isCover?: boolean;
 }) {
   return (
-    <div className="space-y-3 rounded-md border border-border bg-background p-4">
+    <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-sm shadow-black/5">
       <p className="text-sm font-medium text-foreground">{label}</p>
-      <div
-        className={
-          wide
-            ? "flex aspect-[16/9] items-center justify-center overflow-hidden rounded-md border border-border bg-muted"
-            : "flex size-24 items-center justify-center overflow-hidden rounded-md border border-border bg-muted"
-        }
-      >
-        {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="px-3 text-center text-sm text-muted-foreground">
-            Nema slike
-          </span>
-        )}
-      </div>
+      {isCover ? (
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm shadow-black/5">
+          <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted">
+            {url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="px-4 text-center text-sm text-muted-foreground">
+                Izaberi cover fotografiju.
+              </span>
+            )}
+          </div>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Kadar pomeri direktno na telefonu desno. Tako odmah vidis kako ce
+            izgledati na mobilnom.
+          </p>
+        </div>
+      ) : (
+        <div className="flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
+          {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="px-3 text-center text-sm text-muted-foreground">
+              Nema slike
+            </span>
+          )}
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -696,6 +799,9 @@ function MiniSitePreview({
   services,
   slug,
   workers,
+  previewCoverUrl,
+  onCoverFocalXChange,
+  onCoverFocalYChange,
 }: {
   draft: {
     name: string;
@@ -706,6 +812,8 @@ function MiniSitePreview({
     phone: string;
     logo_url: string | null;
     cover_url: string | null;
+    cover_focal_x: number;
+    cover_focal_y: number;
     primary_color: string;
     text_color: string;
     font_choice: string;
@@ -714,32 +822,223 @@ function MiniSitePreview({
   services: SitePreviewService[];
   slug: string;
   workers: SitePreviewWorker[];
+  previewCoverUrl?: string | null;
+  onCoverFocalXChange?: (value: number) => void;
+  onCoverFocalYChange?: (value: number) => void;
 }) {
   const location = [draft.address, draft.city].filter(Boolean).join(", ");
   const heroText = draft.intro_text;
   const theme = getThemeClasses(draft.site_theme);
+  const heroFrameRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startFocalX: number;
+    startFocalY: number;
+  } | null>(null);
+  const [heroImageSize, setHeroImageSize] = useState<{
+    url: string;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [heroFrameSize, setHeroFrameSize] = useState({
+    width: 0,
+    height: 0,
+  });
+  const [isDraggingCover, setIsDraggingCover] = useState(false);
+  const heroImageUrl = previewCoverUrl ?? draft.cover_url ?? null;
+
+  useEffect(() => {
+    if (!heroImageUrl) {
+      return;
+    }
+
+    let cancelled = false;
+    const image = new window.Image();
+
+    image.onload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setHeroImageSize({
+        url: heroImageUrl,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    };
+
+    image.onerror = () => {
+      if (!cancelled) {
+        setHeroImageSize(null);
+      }
+    };
+
+    image.src = heroImageUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [heroImageUrl]);
+
+  useEffect(() => {
+    const frame = heroFrameRef.current;
+
+    if (!frame) {
+      return;
+    }
+
+    const observer = new window.ResizeObserver((entries) => {
+      const nextFrame = entries[0];
+
+      if (!nextFrame) {
+        return;
+      }
+
+      setHeroFrameSize({
+        width: nextFrame.contentRect.width,
+        height: nextFrame.contentRect.height,
+      });
+    });
+
+    observer.observe(frame);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const activeHeroImageSize =
+    heroImageSize?.url === heroImageUrl ? heroImageSize : null;
+  const heroMovement =
+    activeHeroImageSize && heroFrameSize.width > 0 && heroFrameSize.height > 0
+      ? getCoverDragMetrics(
+          heroFrameSize.width,
+          heroFrameSize.height,
+          activeHeroImageSize.width,
+          activeHeroImageSize.height,
+        )
+      : { overflowX: 0, overflowY: 0 };
+  const canMoveHeroX = heroMovement.overflowX > 0;
+  const canMoveHeroY = heroMovement.overflowY > 0;
+
+  function updateHeroFocalPoint(clientX: number, clientY: number) {
+    const frame = heroFrameRef.current?.getBoundingClientRect();
+    const dragState = dragStateRef.current;
+
+    if (!frame || !dragState || !activeHeroImageSize) {
+      return;
+    }
+
+    const metrics = getCoverDragMetrics(
+      frame.width,
+      frame.height,
+      activeHeroImageSize.width,
+      activeHeroImageSize.height,
+    );
+    const deltaX = clientX - dragState.startClientX;
+    const deltaY = clientY - dragState.startClientY;
+
+    if (metrics.overflowX > 0) {
+      onCoverFocalXChange?.(
+        normalizeCoverFocalX(
+          dragState.startFocalX - (deltaX / metrics.overflowX) * 100,
+        ),
+      );
+    }
+
+    if (metrics.overflowY > 0) {
+      onCoverFocalYChange?.(
+        normalizeCoverFocalY(
+          dragState.startFocalY - (deltaY / metrics.overflowY) * 100,
+        ),
+      );
+    }
+  }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,24rem)] overflow-hidden rounded-[1.25rem] border-4 border-foreground bg-background shadow-sm min-[380px]:rounded-[2rem] min-[380px]:border-8">
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="max-w-[15rem] text-sm leading-6 text-muted-foreground">
+          Prevuci cover direktno na telefonu da namestis kadar za mobilni hero.
+        </p>
+        <button
+          type="button"
+          disabled={!heroImageUrl}
+          onClick={() => {
+            onCoverFocalXChange?.(50);
+            onCoverFocalYChange?.(50);
+          }}
+          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Centriraj
+        </button>
+      </div>
+      <div className="mx-auto w-full max-w-[min(100%,24rem)] overflow-hidden rounded-[1.25rem] border-4 border-foreground bg-background shadow-sm min-[380px]:rounded-[2rem] min-[380px]:border-8">
       <div className="h-5 bg-foreground min-[380px]:h-6" />
       <div className={`min-h-[42rem] ${getFontClass(draft.font_choice)}`}>
         <section
-          className="relative flex min-h-[26rem] flex-col justify-end overflow-hidden px-4 pb-5 pt-16 min-[380px]:min-h-[28rem] min-[380px]:px-5 min-[380px]:pb-6 min-[380px]:pt-20"
+          ref={heroFrameRef}
+          className="relative flex min-h-[31rem] flex-col justify-end overflow-hidden px-4 pb-5 pt-16 min-[380px]:min-h-[32rem] min-[380px]:px-5 min-[380px]:pb-6 min-[380px]:pt-20"
           style={{
             backgroundColor: draft.primary_color,
             color: draft.text_color,
+            touchAction: "none",
+          }}
+          onPointerDown={(event) => {
+            if (!heroImageUrl) {
+              return;
+            }
+
+            dragStateRef.current = {
+              pointerId: event.pointerId,
+              startClientX: event.clientX,
+              startClientY: event.clientY,
+              startFocalX: draft.cover_focal_x,
+              startFocalY: draft.cover_focal_y,
+            };
+            setIsDraggingCover(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (dragStateRef.current?.pointerId !== event.pointerId) {
+              return;
+            }
+
+            updateHeroFocalPoint(event.clientX, event.clientY);
+          }}
+          onPointerUp={(event) => {
+            if (dragStateRef.current?.pointerId !== event.pointerId) {
+              return;
+            }
+
+            dragStateRef.current = null;
+            setIsDraggingCover(false);
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
+          onPointerCancel={() => {
+            dragStateRef.current = null;
+            setIsDraggingCover(false);
           }}
         >
-          {draft.cover_url ? (
+          {heroImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={draft.cover_url}
+              src={heroImageUrl}
               alt=""
               className="absolute inset-0 h-full w-full object-cover"
+              style={{
+                cursor: isDraggingCover ? "grabbing" : "grab",
+                objectPosition: `${draft.cover_focal_x}% ${draft.cover_focal_y}%`,
+              }}
             />
           ) : null}
-          {draft.cover_url ? (
-            <div className="absolute inset-0 bg-black/45" />
+          {heroImageUrl ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/65" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background/25 to-transparent" />
+            </>
           ) : null}
           <div className="relative">
             {draft.logo_url ? (
@@ -747,41 +1046,45 @@ function MiniSitePreview({
               <img
                 src={draft.logo_url}
                 alt=""
-                className="mb-4 size-14 rounded-md border border-white/40 bg-white object-cover"
+                className="mb-4 size-14 rounded-2xl border border-white/30 bg-white object-cover shadow-sm shadow-black/15"
               />
             ) : null}
-            <p className="text-xs font-semibold uppercase">
-              Online zakazivanje
-            </p>
-            <h3 className="mt-2 break-words text-[clamp(1.75rem,11vw,2.25rem)] font-bold leading-tight">
-              {draft.name || "Naziv mini sajta"}
-            </h3>
-            {heroText ? (
-              <p className="mt-4 break-words text-sm leading-6 opacity-90">
-                {heroText}
-              </p>
-            ) : null}
-            <div className="mt-5 grid gap-2">
-              <span
-                className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold"
-                style={{
-                  backgroundColor: draft.text_color,
-                  color: draft.primary_color,
-                }}
-              >
-                Zakazi termin
-              </span>
-              {draft.phone ? (
+            <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4 shadow-sm shadow-black/20 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">
+                <span>Online zakazivanje</span>
+                <span className="h-1 w-1 rounded-full bg-white/60" />
+                <span>zakazi.pro/{slug}</span>
+              </div>
+              <h3 className="mt-4 break-words text-[clamp(1.9rem,11vw,2.35rem)] font-bold leading-[0.98] tracking-tight">
+                {draft.name || "Naziv mini sajta"}
+              </h3>
+              {heroText ? (
+                <p className="mt-4 break-words text-sm leading-6 text-white/88">
+                  {heroText}
+                </p>
+              ) : null}
+              <div className="mt-5 grid gap-2">
                 <span
-                  className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold shadow-sm shadow-black/10"
                   style={{
-                    backgroundColor: draft.primary_color,
-                    color: draft.text_color,
+                    backgroundColor: draft.text_color,
+                    color: draft.primary_color,
                   }}
                 >
-                  Pozovi
+                  Zakazi termin
                 </span>
-              ) : null}
+                {draft.phone ? (
+                  <span
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-semibold"
+                    style={{
+                      borderColor: "color-mix(in oklab, white 24%, transparent)",
+                      color: draft.text_color,
+                    }}
+                  >
+                    Pozovi
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -880,6 +1183,15 @@ function MiniSitePreview({
             </div>
           </div>
         </section>
+      </div>
+    </div>
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+          {canMoveHeroX ? "Mozes levo-desno" : "Sirina je vec uskladjena"}
+        </span>
+        <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+          {canMoveHeroY ? "Mozes gore-dole" : "Visina je vec uskladjena"}
+        </span>
       </div>
     </div>
   );

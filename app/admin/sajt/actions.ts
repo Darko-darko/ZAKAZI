@@ -37,6 +37,26 @@ function readSiteTheme(formData: FormData) {
   return siteThemes.has(value) ? value : "default";
 }
 
+function readCoverFocalY(formData: FormData) {
+  const value = Number.parseInt(readString(formData, "cover_focal_y"), 10);
+
+  if (Number.isNaN(value)) {
+    return 50;
+  }
+
+  return Math.min(100, Math.max(0, value));
+}
+
+function readCoverFocalX(formData: FormData) {
+  const value = Number.parseInt(readString(formData, "cover_focal_x"), 10);
+
+  if (Number.isNaN(value)) {
+    return 50;
+  }
+
+  return Math.min(100, Math.max(0, value));
+}
+
 export async function updateSiteBrandingAction(
   _state: SiteBrandingState,
   formData: FormData,
@@ -57,6 +77,8 @@ export async function updateSiteBrandingAction(
     phone: readNullableString(formData, "phone"),
     font_choice: readFontChoice(formData),
     site_theme: readSiteTheme(formData),
+    cover_focal_x: readCoverFocalX(formData),
+    cover_focal_y: readCoverFocalY(formData),
     primary_color: readColor(formData, "primary_color", "#000000"),
     text_color: readColor(formData, "text_color", "#ffffff"),
   };

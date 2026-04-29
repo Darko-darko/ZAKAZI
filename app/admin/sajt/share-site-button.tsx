@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type ShareSiteButtonProps = {
   slug: string;
@@ -16,26 +16,36 @@ export function ShareSiteButton({
   messageClassName,
 }: ShareSiteButtonProps) {
   const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isSharing, setIsSharing] = useState(false);
 
   async function handleShare() {
+    setIsSharing(true);
+    setMessage("");
     const url = `${window.location.origin}/${slug}`;
 
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: providerName,
-          text: `Pogledaj mini sajt za ${providerName}`,
-          url,
-        });
-        setMessage("Link je spreman za deljenje.");
-        return;
+        try {
+          await navigator.share({
+            title: providerName,
+            text: `Pogledaj mini sajt za ${providerName}`,
+            url,
+          });
+          setMessage("Link je spreman za deljenje.");
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+        }
       }
 
       await navigator.clipboard.writeText(url);
       setMessage("Link je kopiran.");
     } catch {
       setMessage("Deljenje nije uspelo. Pokusaj ponovo.");
+    } finally {
+      setIsSharing(false);
     }
   }
 
@@ -43,11 +53,11 @@ export function ShareSiteButton({
     <div className="flex flex-col items-stretch gap-2 sm:items-end">
       <button
         type="button"
-        onClick={() => startTransition(handleShare)}
-        disabled={isPending}
+        onClick={handleShare}
+        disabled={isSharing}
         className={className}
       >
-        {isPending ? "Priprema..." : "Share link"}
+        {isSharing ? "Priprema..." : "Share link"}
       </button>
       {message ? (
         <p

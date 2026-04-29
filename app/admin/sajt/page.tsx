@@ -9,18 +9,20 @@ export const metadata = {
 
 export default async function AdminSitePage() {
   const { supabase, provider: currentProvider } = await getCurrentProvider();
-  const providerSelect =
+  const providerBaseSelect =
+    "id, name, slug, description, intro_text, address, city, phone, logo_url, cover_url, cover_focal_x, cover_focal_y, primary_color, text_color, font_choice";
+  const providerFallbackSelect =
     "id, name, slug, description, intro_text, address, city, phone, logo_url, cover_url, primary_color, text_color, font_choice";
   const providerWithThemeResult = await supabase
     .from("providers")
-    .select(`${providerSelect}, site_theme`)
+    .select(`${providerBaseSelect}, site_theme`)
     .eq("id", currentProvider.id)
     .eq("user_id", currentProvider.user_id)
     .maybeSingle();
   const providerResult = providerWithThemeResult.error
     ? await supabase
         .from("providers")
-        .select(providerSelect)
+        .select(providerFallbackSelect)
         .eq("id", currentProvider.id)
         .eq("user_id", currentProvider.user_id)
         .maybeSingle()
@@ -28,6 +30,16 @@ export default async function AdminSitePage() {
   const provider = providerResult.data
     ? {
         ...providerResult.data,
+        cover_focal_x:
+          "cover_focal_x" in providerResult.data &&
+          typeof providerResult.data.cover_focal_x === "number"
+            ? providerResult.data.cover_focal_x
+            : 50,
+        cover_focal_y:
+          "cover_focal_y" in providerResult.data &&
+          typeof providerResult.data.cover_focal_y === "number"
+            ? providerResult.data.cover_focal_y
+            : 50,
         site_theme:
           "site_theme" in providerResult.data &&
           typeof providerResult.data.site_theme === "string"
@@ -60,7 +72,7 @@ export default async function AdminSitePage() {
 
   return (
     <main className="flex flex-1 bg-[radial-gradient(circle_at_top,theme(colors.brand-soft),transparent_42%),linear-gradient(to_bottom,theme(colors.background),theme(colors.background))] px-4 py-8 sm:px-6 sm:py-10">
-      <section className="mx-auto w-full max-w-6xl space-y-8">
+      <section className="mx-auto w-full max-w-[92rem] space-y-8">
         <header className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-sm shadow-black/5">
           <div className="flex flex-col gap-5 p-5 sm:p-7 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -104,7 +116,7 @@ export default async function AdminSitePage() {
 
         </header>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="grid gap-8">
           <div className="space-y-8">
             <SiteEditor
               provider={provider}
