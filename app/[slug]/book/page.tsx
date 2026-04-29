@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { StepConfirm } from "./step-confirm";
 import { StepService } from "./step-service";
@@ -74,7 +75,7 @@ export default async function BookingPage({
             </p>
             <Link
               href={`/${provider.slug}`}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-md bg-primary px-4 font-semibold text-primary-foreground"
+              className="btn-primary mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-md px-4 font-semibold text-primary-foreground"
             >
               Nazad na stranicu
             </Link>
@@ -273,12 +274,24 @@ async function Step3({
   dateParam: string | undefined;
 }) {
   const selectedDate = dateParam ?? todayInBelgrade();
-  const { data: slots } = await supabase.rpc("get_public_slots", {
-    p_provider_id: providerId,
-    p_service_id: serviceId,
-    p_date: selectedDate,
-    ...(isAnyWorker ? {} : { p_worker_id: workerParam }),
-  });
+  const adminSupabase = createAdminClient();
+  const [{ data: slots }, { data: nonWorkingDay }] = await Promise.all([
+    supabase.rpc("get_public_slots", {
+      p_provider_id: providerId,
+      p_service_id: serviceId,
+      p_date: selectedDate,
+      ...(isAnyWorker ? {} : { p_worker_id: workerParam }),
+    }),
+    adminSupabase
+      .from("time_off")
+      .select("reason, is_public_holiday")
+      .eq("provider_id", providerId)
+      .is("worker_id", null)
+      .lte("date_from", selectedDate)
+      .gte("date_to", selectedDate)
+      .limit(1)
+      .maybeSingle(),
+  ]);
   const orderedSlots = (slots ?? []).slice().sort((a, b) => {
     const timeCompare =
       new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
@@ -290,6 +303,14 @@ async function Step3({
     return a.worker_name.localeCompare(b.worker_name, "sr-Latn-RS");
   });
 
+  const nonWorkingMessage = nonWorkingDay
+    ? nonWorkingDay.reason
+      ? `Neradni dan: ${nonWorkingDay.reason}`
+      : nonWorkingDay.is_public_holiday
+        ? "Neradni dan zbog praznika."
+        : "Neradni dan."
+    : null;
+
   return (
     <StepSlot
       slug={slug}
@@ -298,6 +319,7 @@ async function Step3({
       selectedDate={selectedDate}
       slots={orderedSlots}
       showWorkerName={isAnyWorker}
+      nonWorkingMessage={nonWorkingMessage}
     />
   );
 }

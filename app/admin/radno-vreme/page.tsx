@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
-import { updateWorkingHoursAction } from "./actions";
+import {
+  createNonWorkingDayAction,
+  deleteNonWorkingDayAction,
+  updateWorkingHoursAction,
+} from "./actions";
+import { NonWorkingDaysForm } from "./non-working-days-form";
 import { WorkingHoursForm } from "./working-hours-form";
 
 export const metadata = {
@@ -16,11 +21,27 @@ const defaultHours = Array.from({ length: 7 }, (_, day) => ({
 
 export default async function WorkingHoursPage() {
   const { supabase, provider } = await getCurrentProvider();
-  const { data: hours } = await supabase
-    .from("provider_working_hours")
-    .select("day_of_week, opens_at, closes_at, is_closed")
-    .eq("provider_id", provider.id)
-    .order("day_of_week", { ascending: true });
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Belgrade",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const [{ data: hours }, { data: nonWorkingDays }] = await Promise.all([
+    supabase
+      .from("provider_working_hours")
+      .select("day_of_week, opens_at, closes_at, is_closed")
+      .eq("provider_id", provider.id)
+      .order("day_of_week", { ascending: true }),
+    supabase
+      .from("time_off")
+      .select("id, date_from, date_to, reason, is_public_holiday")
+      .eq("provider_id", provider.id)
+      .is("worker_id", null)
+      .gte("date_to", today)
+      .order("date_from", { ascending: true }),
+  ]);
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -40,7 +61,7 @@ export default async function WorkingHoursPage() {
           </div>
           <Link
             href="/admin/raspored"
-            className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+            className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-foreground"
           >
             Raspored radnika
           </Link>
@@ -54,6 +75,12 @@ export default async function WorkingHoursPage() {
         <WorkingHoursForm
           action={updateWorkingHoursAction}
           hours={hours?.length ? hours : defaultHours}
+        />
+
+        <NonWorkingDaysForm
+          action={createNonWorkingDayAction}
+          deleteAction={deleteNonWorkingDayAction}
+          days={nonWorkingDays ?? []}
         />
       </section>
     </main>

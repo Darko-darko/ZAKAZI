@@ -21,6 +21,7 @@ type StepSlotProps = {
   selectedDate: string;
   slots: PublicSlot[];
   showWorkerName: boolean;
+  nonWorkingMessage?: string | null;
 };
 
 export function StepSlot({
@@ -30,6 +31,7 @@ export function StepSlot({
   selectedDate,
   slots,
   showWorkerName,
+  nonWorkingMessage,
 }: StepSlotProps) {
   const today = todayInBelgrade();
   const dates = Array.from({ length: 7 }, (_, index) => addDays(today, index));
@@ -102,7 +104,7 @@ export function StepSlot({
           </div>
         ) : (
           <div className="rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground">
-            Nema slobodnih termina za izabrani dan.
+            {nonWorkingMessage ?? "Nema slobodnih termina za izabrani dan."}
           </div>
         )}
       </div>

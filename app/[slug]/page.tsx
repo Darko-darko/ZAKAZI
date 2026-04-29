@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type PublicProviderPageProps = {
@@ -59,6 +60,32 @@ function getThemeClasses(siteTheme: string | null) {
   };
 }
 
+function todayInBelgrade() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Belgrade",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Belgrade",
+  }).format(new Date(`${value}T12:00:00+01:00`));
+}
+
+function formatDateRange(dateFrom: string, dateTo: string) {
+  if (dateFrom === dateTo) {
+    return formatDate(dateFrom);
+  }
+
+  return `${formatDate(dateFrom)} - ${formatDate(dateTo)}`;
+}
+
 export default async function PublicProviderPage({
   params,
 }: PublicProviderPageProps) {
@@ -73,13 +100,27 @@ export default async function PublicProviderPage({
     notFound();
   }
 
-  const [{ data: services }, { data: workers }, { data: gallery }] =
+  const adminSupabase = createAdminClient();
+  const [
+    { data: services },
+    { data: workers },
+    { data: gallery },
+    { data: nonWorkingDays },
+  ] =
     await Promise.all([
       supabase.rpc("get_public_services", { p_provider_id: provider.id }),
       supabase.rpc("get_public_workers", { p_provider_id: provider.id }),
       supabase.rpc("get_public_provider_gallery", {
         p_provider_id: provider.id,
       }),
+      adminSupabase
+        .from("time_off")
+        .select("id, date_from, date_to, reason, is_public_holiday")
+        .eq("provider_id", provider.id)
+        .is("worker_id", null)
+        .gte("date_to", todayInBelgrade())
+        .order("date_from", { ascending: true })
+        .limit(6),
     ]);
 
   const heroImage = provider.cover_url ?? gallery?.[0]?.image_url ?? null;
@@ -155,7 +196,7 @@ export default async function PublicProviderPage({
 
       <section className={theme.page}>
         <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
-        {provider.description ? (
+          {provider.description ? (
           <div className={`mb-8 rounded-md border p-5 sm:p-6 ${theme.card}`}>
             <p
               className={`whitespace-pre-line break-words text-base leading-7 ${theme.muted}`}
@@ -164,6 +205,29 @@ export default async function PublicProviderPage({
             </p>
           </div>
         ) : null}
+
+          {nonWorkingDays?.length ? (
+            <div className={`mb-8 rounded-md border p-5 sm:p-6 ${theme.card}`}>
+              <h2 className={`text-2xl font-bold tracking-tight ${theme.heading}`}>
+                Neradni dani
+              </h2>
+              <div className={`mt-4 space-y-4 text-sm ${theme.muted}`}>
+                {nonWorkingDays.map((day) => (
+                  <div key={day.id}>
+                    <p className={`font-semibold ${theme.heading}`}>
+                      {formatDateRange(day.date_from, day.date_to)}
+                    </p>
+                    <p className="mt-1">
+                      {day.reason ||
+                        (day.is_public_holiday
+                          ? "Praznik."
+                          : "Salon ne radi u ovom periodu.")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-8 lg:grid-cols-[1fr_18rem]">
           <div>
