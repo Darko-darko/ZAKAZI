@@ -569,7 +569,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? "Cuvanje..." : "Sacuvaj mini sajt"}
           </button>
@@ -668,7 +668,7 @@ function AssetUploader({
           type="button"
           disabled={isUploading}
           onClick={onRemove}
-          className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
           Ukloni
         </button>

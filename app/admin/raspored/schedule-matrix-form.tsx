@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TimeInput } from "@/app/admin/_components/time-input";
 
 const weekDays = [
   [1, "Pon"],
@@ -202,11 +203,10 @@ export function ScheduleMatrixForm({
               <label htmlFor="bulk_custom_start" className="text-sm font-medium text-foreground">
                 Od
               </label>
-              <input
+              <TimeInput
                 id="bulk_custom_start"
-                type="time"
                 value={bulkCustomStart}
-                onChange={(event) => setBulkCustomStart(event.target.value)}
+                onValueChange={setBulkCustomStart}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
             </div>
@@ -214,11 +214,10 @@ export function ScheduleMatrixForm({
               <label htmlFor="bulk_custom_end" className="text-sm font-medium text-foreground">
                 Do
               </label>
-              <input
+              <TimeInput
                 id="bulk_custom_end"
-                type="time"
                 value={bulkCustomEnd}
-                onChange={(event) => setBulkCustomEnd(event.target.value)}
+                onValueChange={setBulkCustomEnd}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
             </div>
@@ -228,7 +227,7 @@ export function ScheduleMatrixForm({
         <button
           type="button"
           onClick={() => applyBulkToDays(weekDays.map(([dayIndex]) => dayIndex))}
-          className="self-end rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+          className="btn-secondary self-end rounded-md px-3 py-2 text-sm font-medium text-foreground"
         >
           Primeni celu nedelju
         </button>
@@ -236,7 +235,7 @@ export function ScheduleMatrixForm({
         <button
           type="button"
           onClick={() => applyBulkToDays([1, 2, 3, 4, 5])}
-          className="self-end rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+          className="btn-secondary self-end rounded-md px-3 py-2 text-sm font-medium text-foreground"
         >
           Primeni pon-pet
         </button>
@@ -325,35 +324,33 @@ export function ScheduleMatrixForm({
 
                         {mode === "custom" ? (
                           <div className="grid grid-cols-2 gap-2">
-                            <input
+                            <TimeInput
                               id={`custom_start_${key}`}
                               name={`custom_start_${key}`}
-                              type="time"
                               aria-label="Custom od"
                               value={schedule?.customStart ?? ""}
-                              onChange={(event) =>
+                              onValueChange={(nextValue) =>
                                 setCells((current) => ({
                                   ...current,
                                   [key]: {
                                     ...current[key],
-                                    customStart: event.target.value,
+                                    customStart: nextValue,
                                   },
                                 }))
                               }
                               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                             />
-                            <input
+                            <TimeInput
                               id={`custom_end_${key}`}
                               name={`custom_end_${key}`}
-                              type="time"
                               aria-label="Custom do"
                               value={schedule?.customEnd ?? ""}
-                              onChange={(event) =>
+                              onValueChange={(nextValue) =>
                                 setCells((current) => ({
                                   ...current,
                                   [key]: {
                                     ...current[key],
-                                    customEnd: event.target.value,
+                                    customEnd: nextValue,
                                   },
                                 }))
                               }
@@ -400,7 +397,7 @@ export function ScheduleMatrixForm({
       <button
         type="submit"
         disabled={!workers.length}
-        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary rounded-md px-4 py-2.5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         Sacuvaj raspored
       </button>

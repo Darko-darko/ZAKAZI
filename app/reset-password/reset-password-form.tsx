@@ -116,7 +116,7 @@ export function ResetPasswordForm({
         </p>
         <Link
           href="/forgot-password"
-          className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90"
+          className="btn-primary inline-flex w-full items-center justify-center rounded-md px-4 py-2.5 font-medium text-primary-foreground"
         >
           Zatraži novi reset link
         </Link>
@@ -153,7 +153,7 @@ export function ResetPasswordForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary w-full rounded-md px-4 py-2.5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Čuvanje..." : "Promeni lozinku"}
       </button>

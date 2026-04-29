@@ -56,13 +56,13 @@ export default async function SchedulePage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/admin/radno-vreme"
-              className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+              className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-foreground"
             >
               Radno vreme
             </Link>
             <Link
               href="/admin/smene"
-              className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+              className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-foreground"
             >
               Smene
             </Link>

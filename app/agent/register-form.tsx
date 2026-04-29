@@ -113,7 +113,7 @@ function FormFields({
       <button
         type="submit"
         disabled={pending}
-        className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50 sm:w-auto"
+        className="btn-primary mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:w-auto"
       >
         {pending ? "Registrujem..." : "Registruj salon"}
       </button>
@@ -172,7 +172,7 @@ export function RegisterProviderForm() {
             <button
               type="button"
               onClick={copyPassword}
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent"
+              className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground"
             >
               {copied ? "Kopirano ✓" : "Kopiraj"}
             </button>

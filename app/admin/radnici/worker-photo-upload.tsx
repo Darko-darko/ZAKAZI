@@ -146,7 +146,7 @@ export function WorkerPhotoUpload({
                 type="button"
                 disabled={isPending}
                 onClick={removePhoto}
-                className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Cuvanje..." : "Ukloni fotografiju"}
               </button>

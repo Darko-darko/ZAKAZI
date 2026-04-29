@@ -74,7 +74,7 @@ export function ArchiveWorkerForm({ action }: ArchiveWorkerFormProps) {
           type="button"
           disabled={pending}
           onClick={() => setIsConfirming(false)}
-          className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-secondary rounded-md px-4 py-2.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           Odustani
         </button>

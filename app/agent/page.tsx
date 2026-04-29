@@ -98,7 +98,7 @@ export default async function AgentPage() {
             </p>
           </div>
           <form action={logoutAction}>
-            <button className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent">
+            <button className="btn-secondary rounded-md px-4 py-2 text-sm font-medium text-foreground">
               Odjavi se
             </button>
           </form>

@@ -33,8 +33,8 @@ export function WorkerActionForm({
   );
   const buttonClass =
     variant === "secondary"
-      ? "rounded-md border border-border px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-      : "rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
+      ? "btn-secondary rounded-md px-4 py-2.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      : "btn-primary rounded-md px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <form action={formAction} className="space-y-2">

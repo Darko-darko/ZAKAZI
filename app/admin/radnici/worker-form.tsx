@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { TimeInput } from "@/app/admin/_components/time-input";
 
 type WorkerActionState = {
   status: "idle" | "success" | "error";
@@ -79,7 +80,7 @@ export function WorkerForm({ action, submitLabel, worker }: WorkerFormProps) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary rounded-md px-4 py-2.5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? "Cuvanje..." : submitLabel}
       </button>
@@ -190,7 +191,7 @@ export function WorkerServicesForm({
       <button
         type="submit"
         disabled={!services.length || pending}
-        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary rounded-md px-4 py-2.5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? "Cuvanje..." : "Sacuvaj usluge radnika"}
       </button>
@@ -356,11 +357,10 @@ export function WorkerScheduleForm({
                 <label className="text-sm font-medium text-foreground" htmlFor="bulk_custom_start">
                   Od
                 </label>
-                <input
+                <TimeInput
                   id="bulk_custom_start"
-                  type="time"
                   value={bulkCustomStart}
-                  onChange={(event) => setBulkCustomStart(event.target.value)}
+                  onValueChange={setBulkCustomStart}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                 />
               </div>
@@ -368,11 +368,10 @@ export function WorkerScheduleForm({
                 <label className="text-sm font-medium text-foreground" htmlFor="bulk_custom_end">
                   Do
                 </label>
-                <input
+                <TimeInput
                   id="bulk_custom_end"
-                  type="time"
                   value={bulkCustomEnd}
-                  onChange={(event) => setBulkCustomEnd(event.target.value)}
+                  onValueChange={setBulkCustomEnd}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                 />
               </div>
@@ -382,7 +381,7 @@ export function WorkerScheduleForm({
           <button
             type="button"
             onClick={() => applyBulkToDays(weekDays.map(([dayIndex]) => dayIndex))}
-            className="self-end rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+            className="btn-secondary self-end rounded-md px-3 py-2 text-sm font-medium text-foreground"
           >
             Primeni na sve dane
           </button>
@@ -390,7 +389,7 @@ export function WorkerScheduleForm({
           <button
             type="button"
             onClick={() => applyBulkToDays([1, 2, 3, 4, 5])}
-            className="self-end rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+            className="btn-secondary self-end rounded-md px-3 py-2 text-sm font-medium text-foreground"
           >
             Primeni pon-pet
           </button>
@@ -484,17 +483,16 @@ export function WorkerScheduleForm({
                       >
                         Custom od
                       </label>
-                      <input
+                      <TimeInput
                         id={`custom_start_${dayIndex}`}
                         name={`custom_start_${dayIndex}`}
-                        type="time"
                         value={schedule?.customStart ?? ""}
-                        onChange={(event) =>
+                        onValueChange={(nextValue) =>
                           setDaySchedules((current) => ({
                             ...current,
                             [dayIndex]: {
                               ...current[dayIndex],
-                              customStart: event.target.value,
+                              customStart: nextValue,
                             },
                           }))
                         }
@@ -509,17 +507,16 @@ export function WorkerScheduleForm({
                       >
                         Custom do
                       </label>
-                      <input
+                      <TimeInput
                         id={`custom_end_${dayIndex}`}
                         name={`custom_end_${dayIndex}`}
-                        type="time"
                         value={schedule?.customEnd ?? ""}
-                        onChange={(event) =>
+                        onValueChange={(nextValue) =>
                           setDaySchedules((current) => ({
                             ...current,
                             [dayIndex]: {
                               ...current[dayIndex],
-                              customEnd: event.target.value,
+                              customEnd: nextValue,
                             },
                           }))
                         }
@@ -534,17 +531,16 @@ export function WorkerScheduleForm({
                       >
                         Pauza od
                       </label>
-                      <input
+                      <TimeInput
                         id={`custom_break_start_${dayIndex}`}
                         name={`custom_break_start_${dayIndex}`}
-                        type="time"
                         value={schedule?.customBreakStart ?? ""}
-                        onChange={(event) =>
+                        onValueChange={(nextValue) =>
                           setDaySchedules((current) => ({
                             ...current,
                             [dayIndex]: {
                               ...current[dayIndex],
-                              customBreakStart: event.target.value,
+                              customBreakStart: nextValue,
                             },
                           }))
                         }
@@ -559,17 +555,16 @@ export function WorkerScheduleForm({
                       >
                         Pauza do
                       </label>
-                      <input
+                      <TimeInput
                         id={`custom_break_end_${dayIndex}`}
                         name={`custom_break_end_${dayIndex}`}
-                        type="time"
                         value={schedule?.customBreakEnd ?? ""}
-                        onChange={(event) =>
+                        onValueChange={(nextValue) =>
                           setDaySchedules((current) => ({
                             ...current,
                             [dayIndex]: {
                               ...current[dayIndex],
-                              customBreakEnd: event.target.value,
+                              customBreakEnd: nextValue,
                             },
                           }))
                         }
@@ -600,7 +595,7 @@ export function WorkerScheduleForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-primary px-4 py-2.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary rounded-md px-4 py-2.5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? "Cuvanje..." : "Sacuvaj raspored"}
       </button>

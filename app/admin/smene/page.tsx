@@ -37,7 +37,7 @@ export default async function ShiftsPage() {
           </div>
           <Link
             href="/admin/smene/novi"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             Dodaj smenu
           </Link>

@@ -22,8 +22,8 @@ function getStatusLabel(worker: {
 
 function getFilterClass(active: boolean) {
   return active
-    ? "rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-    : "rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-accent";
+    ? "btn-primary rounded-md px-3 py-2 text-sm font-medium text-primary-foreground"
+    : "btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground";
 }
 
 export default async function WorkersPage({ searchParams }: WorkersPageProps) {
@@ -68,7 +68,7 @@ export default async function WorkersPage({ searchParams }: WorkersPageProps) {
           </div>
           <Link
             href="/admin/radnici/novi"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             Dodaj radnika
           </Link>
