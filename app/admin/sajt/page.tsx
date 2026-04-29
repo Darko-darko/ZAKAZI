@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteEditor } from "./site-editor";
+import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
 
 export const metadata = {
@@ -75,13 +76,11 @@ export default async function AdminSitePage() {
               Uredi javnu stranicu za zakazi.pro/{provider.slug}
             </p>
           </div>
-          <Link
-            href={`/${provider.slug}`}
-            target="_blank"
-            className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground"
-          >
-            Pogledaj javno
-          </Link>
+          <ShareSiteButton
+            slug={provider.slug}
+            providerName={provider.name}
+            className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          />
         </header>
 
         <SiteEditor

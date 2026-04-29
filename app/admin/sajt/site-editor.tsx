@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ShareSiteButton } from "./share-site-button";
 import {
   type SiteBrandingState,
   updateSiteAssetAction,
@@ -430,7 +431,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                   <span className="text-sm font-medium text-foreground">
                     Pozadina hero dela
                   </span>
-                  <span className="flex gap-3">
+                  <span className="grid gap-2 min-[420px]:grid-cols-[3.5rem_minmax(0,1fr)]">
                     <input
                       type="color"
                       value={
@@ -441,7 +442,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("primary_color", event.target.value)
                       }
-                      className="h-11 w-14 rounded-md border border-input bg-background p-1"
+                      className="h-11 w-14 shrink-0 rounded-md border border-input bg-background p-1"
                     />
                     <input
                       name="primary_color"
@@ -449,7 +450,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("primary_color", event.target.value)
                       }
-                      className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                      className="min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                     />
                   </span>
                 </label>
@@ -458,7 +459,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                   <span className="text-sm font-medium text-foreground">
                     Tekst i dugmad u hero delu
                   </span>
-                  <span className="flex gap-3">
+                  <span className="grid gap-2 min-[420px]:grid-cols-[3.5rem_minmax(0,1fr)]">
                     <input
                       type="color"
                       value={
@@ -469,7 +470,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("text_color", event.target.value)
                       }
-                      className="h-11 w-14 rounded-md border border-input bg-background p-1"
+                      className="h-11 w-14 shrink-0 rounded-md border border-input bg-background p-1"
                     />
                     <input
                       name="text_color"
@@ -477,7 +478,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("text_color", event.target.value)
                       }
-                      className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                      className="min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                     />
                   </span>
                 </label>
@@ -591,14 +592,12 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
       <aside className="lg:sticky lg:top-6">
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">Preview</h2>
-          <a
-            href={`/${provider.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Otvori javno
-          </a>
+          <ShareSiteButton
+            slug={provider.slug}
+            providerName={draft.name || provider.name}
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 lg:hidden"
+            messageClassName="lg:hidden"
+          />
         </div>
         <div className="overflow-x-hidden">
           <MiniSitePreview
