@@ -59,35 +59,60 @@ export default async function AdminSitePage() {
   ]);
 
   return (
-    <main className="flex flex-1 px-4 py-8 sm:px-6 sm:py-10">
+    <main className="flex flex-1 bg-[radial-gradient(circle_at_top,theme(colors.brand-soft),transparent_42%),linear-gradient(to_bottom,theme(colors.background),theme(colors.background))] px-4 py-8 sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-6xl space-y-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Admin
-            </Link>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              Mini sajt
-            </h1>
-            <p className="text-muted-foreground">
-              Uredi javnu stranicu za zakazi.pro/{provider.slug}
-            </p>
+        <header className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-sm shadow-black/5">
+          <div className="flex flex-col gap-5 p-5 sm:p-7 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand-soft px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+                <span>Admin</span>
+                <span className="h-1 w-1 rounded-full bg-brand/40" />
+                <span>Mini sajt editor</span>
+              </div>
+              <div className="space-y-2">
+                <Link
+                  href="/admin"
+                  className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                >
+                  Admin
+                </Link>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  Mini sajt
+                </h1>
+                <p className="max-w-xl text-muted-foreground">
+                  Uredi javnu stranicu za zakazi.pro/{provider.slug}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-border/70 bg-gradient-to-br from-background via-background to-warm-soft p-4 sm:min-w-[18rem]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Javni link
+              </p>
+              <p className="mt-2 text-sm text-foreground">
+                Podeli mini sajt sa klijentima ili ga proveri uživo.
+              </p>
+              <div className="mt-4">
+                <ShareSiteButton
+                  slug={provider.slug}
+                  providerName={provider.name}
+                  className="btn-secondary inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </div>
+            </div>
           </div>
-          <ShareSiteButton
-            slug={provider.slug}
-            providerName={provider.name}
-            className="btn-secondary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          />
+
         </header>
 
-        <SiteEditor
-          provider={provider}
-          services={services ?? []}
-          workers={workers ?? []}
-        />
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="space-y-8">
+            <SiteEditor
+              provider={provider}
+              services={services ?? []}
+              workers={workers ?? []}
+            />
+          </div>
+        </div>
       </section>
     </main>
   );

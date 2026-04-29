@@ -267,15 +267,17 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   return (
     <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
       <form action={formAction} className="min-w-0 space-y-6">
-        <section className="rounded-md border border-border bg-card p-5 sm:p-6">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-foreground">Sadrzaj</h2>
-            <p className="text-sm text-muted-foreground">
+        <section className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-sm shadow-black/5">
+          <div className="border-b border-border/60 bg-gradient-to-r from-brand-soft/65 via-background to-warm-soft/55 px-5 py-4 sm:px-6">
+            <div className="inline-flex items-center rounded-full border border-brand/15 bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand shadow-sm shadow-brand/5">
+              Sadržaj
+            </div>
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Osnovni tekst i kontakt podaci za javni mini sajt.
             </p>
           </div>
 
-          <div className="mt-5 space-y-5">
+          <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
             <div className="space-y-2">
               <label
                 htmlFor="name"
@@ -431,7 +433,12 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                   <span className="text-sm font-medium text-foreground">
                     Pozadina hero dela
                   </span>
-                  <span className="grid gap-2 min-[420px]:grid-cols-[3.5rem_minmax(0,1fr)]">
+                  <input
+                    type="hidden"
+                    name="primary_color"
+                    value={draft.primary_color}
+                  />
+                  <span className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                     <input
                       type="color"
                       value={
@@ -442,16 +449,16 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("primary_color", event.target.value)
                       }
-                      className="h-11 w-14 shrink-0 rounded-md border border-input bg-background p-1"
+                      className="h-11 w-14 shrink-0 rounded-lg border border-input bg-background p-1"
                     />
-                    <input
-                      name="primary_color"
-                      value={draft.primary_color}
-                      onChange={(event) =>
-                        setField("primary_color", event.target.value)
-                      }
-                      className="min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">
+                        Izaberi boju
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Boja pozadine gornjeg dela stranice.
+                      </span>
+                    </span>
                   </span>
                 </label>
 
@@ -459,7 +466,12 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                   <span className="text-sm font-medium text-foreground">
                     Tekst i dugmad u hero delu
                   </span>
-                  <span className="grid gap-2 min-[420px]:grid-cols-[3.5rem_minmax(0,1fr)]">
+                  <input
+                    type="hidden"
+                    name="text_color"
+                    value={draft.text_color}
+                  />
+                  <span className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                     <input
                       type="color"
                       value={
@@ -470,16 +482,16 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                       onChange={(event) =>
                         setField("text_color", event.target.value)
                       }
-                      className="h-11 w-14 shrink-0 rounded-md border border-input bg-background p-1"
+                      className="h-11 w-14 shrink-0 rounded-lg border border-input bg-background p-1"
                     />
-                    <input
-                      name="text_color"
-                      value={draft.text_color}
-                      onChange={(event) =>
-                        setField("text_color", event.target.value)
-                      }
-                      className="min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">
+                        Izaberi boju
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Boja teksta i glavnih dugmadi.
+                      </span>
+                    </span>
                   </span>
                 </label>
               </div>
