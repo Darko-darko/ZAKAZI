@@ -49,6 +49,8 @@ export function StepSlot({
         <div className="flex gap-2 pb-1 sm:grid sm:grid-cols-7 sm:gap-2">
           {dates.map((date) => {
             const isSelected = date === selectedDate;
+            const isToday = date === today;
+            const [weekday, ...rest] = formatDateShort(date).split(" ");
 
             return (
               <Link
@@ -59,17 +61,23 @@ export function StepSlot({
                   date,
                 })}
                 replace
-                className={`flex min-h-14 min-w-20 flex-col items-center justify-center rounded-md border px-3 text-center transition ${
+                className={
                   isSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card text-foreground hover:border-primary"
-                }`}
+                    ? "flex min-h-16 min-w-20 flex-col items-center justify-center rounded-xl border border-brand bg-brand px-3 text-center text-brand-foreground shadow-md transition"
+                    : "flex min-h-16 min-w-20 flex-col items-center justify-center rounded-xl border border-border bg-card px-3 text-center text-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
+                }
               >
-                <span className="text-xs font-medium uppercase tracking-wide opacity-80">
-                  {formatDateShort(date).split(" ")[0]}
+                <span
+                  className={
+                    isSelected
+                      ? "text-[10px] font-semibold uppercase tracking-wider opacity-90"
+                      : "text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  }
+                >
+                  {isToday ? "Danas" : weekday}
                 </span>
-                <span className="mt-0.5 text-sm font-bold">
-                  {formatDateShort(date).split(" ").slice(1).join(" ")}
+                <span className="mt-0.5 text-base font-bold">
+                  {rest.join(" ")}
                 </span>
               </Link>
             );
@@ -89,9 +97,9 @@ export function StepSlot({
                   date: selectedDate,
                   slot: `${slot.worker_id}|${slot.starts_at}`,
                 })}
-                className="flex min-h-14 flex-col items-center justify-center rounded-md border border-border bg-card px-2 text-center transition hover:border-primary hover:ring-2 hover:ring-primary/15"
+                className="group flex min-h-14 flex-col items-center justify-center rounded-xl border border-border bg-card px-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-brand hover:bg-brand-soft hover:shadow-md"
               >
-                <span className="text-base font-bold text-foreground">
+                <span className="text-base font-bold text-foreground transition group-hover:text-brand">
                   {formatTime(slot.starts_at)}
                 </span>
                 {showWorkerName ? (
@@ -103,8 +111,21 @@ export function StepSlot({
             ))}
           </div>
         ) : (
-          <div className="rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground">
-            {nonWorkingMessage ?? "Nema slobodnih termina za izabrani dan."}
+          <div className="flex items-start gap-3 rounded-xl border border-warm/30 bg-warm-soft p-4 text-sm text-warm-foreground">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+            <span>{nonWorkingMessage ?? "Nema slobodnih termina za izabrani dan."}</span>
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -63,8 +64,22 @@ export default async function BookingPage({
     return (
       <main className="flex flex-1 bg-background px-5 py-8">
         <section className="mx-auto flex w-full max-w-md flex-col justify-center">
-          <div className="rounded-md border border-border bg-card p-5">
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-brand">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6"
+                aria-hidden
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <p className="mt-4 text-sm font-medium uppercase tracking-wide text-brand">
               Termin je zakazan
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
@@ -75,7 +90,7 @@ export default async function BookingPage({
             </p>
             <Link
               href={`/${provider.slug}`}
-              className="btn-primary mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-md px-4 font-semibold text-primary-foreground"
+              className="btn-primary mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl px-4 font-semibold text-primary-foreground"
             >
               Nazad na stranicu
             </Link>
@@ -131,53 +146,107 @@ export default async function BookingPage({
       <section className="mx-auto w-full max-w-3xl px-4 py-5 sm:px-6 sm:py-8">
         <Link
           href={`/${provider.slug}`}
-          className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-brand"
         >
-          ← Nazad na stranicu
+          <span aria-hidden>←</span> Nazad na stranicu
         </Link>
 
         <header className="mt-4">
-          <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand">
             Online zakazivanje
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="mt-1.5 text-3xl font-bold tracking-tight text-foreground">
             {provider.name}
           </h1>
         </header>
 
-        <nav aria-label="Koraci" className="mt-5">
-          <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <nav aria-label="Koraci" className="mt-6">
+          <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-brand transition-all duration-300"
+              style={{ width: `${(step / 4) * 100}%` }}
+            />
+          </div>
+          <ol className="flex items-center gap-1.5 text-sm sm:gap-2">
             {([1, 2, 3, 4] as Step[]).map((index, position) => {
               const isCurrent = index === step;
               const isCompleted = index < step;
               const label = STEP_LABELS[index];
 
-              return (
-                <li key={index} className="flex items-center gap-2">
-                  {position > 0 ? (
-                    <span aria-hidden="true" className="text-muted-foreground">
-                      ›
-                    </span>
-                  ) : null}
+              const itemBase =
+                "inline-flex items-center gap-1.5 rounded-full transition";
+              const itemPadding = isCurrent
+                ? "px-3 py-1"
+                : "p-0.5 sm:px-3 sm:py-1";
+              const itemColors = isCurrent
+                ? "bg-brand text-brand-foreground font-semibold shadow-sm"
+                : isCompleted
+                  ? "text-brand font-medium hover:bg-brand-soft sm:bg-brand-soft sm:hover:bg-brand sm:hover:text-brand-foreground"
+                  : "text-muted-foreground";
+
+              const itemClass = `${itemBase} ${itemPadding} ${itemColors}`;
+
+              const numberBadge = (
+                <span
+                  className={
+                    isCurrent
+                      ? "grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-foreground/20 text-[10px] font-bold"
+                      : isCompleted
+                        ? "grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground"
+                        : "grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border bg-background text-[10px] font-bold"
+                  }
+                >
                   {isCompleted ? (
-                    <Link
-                      href={stepUrl(index)}
-                      className="font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3 w-3"
+                      aria-hidden
                     >
-                      {label}
-                    </Link>
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
                   ) : (
-                    <span
-                      className={
-                        isCurrent
-                          ? "font-semibold text-foreground"
-                          : "text-muted-foreground"
-                      }
-                    >
-                      {label}
-                    </span>
+                    index
                   )}
-                </li>
+                </span>
+              );
+
+              const labelEl = (
+                <span className={isCurrent ? "" : "hidden sm:inline"}>
+                  {label}
+                </span>
+              );
+
+              const connectorColor =
+                isCompleted || isCurrent ? "bg-brand" : "bg-border";
+
+              return (
+                <Fragment key={index}>
+                  {position > 0 ? (
+                    <li
+                      role="presentation"
+                      aria-hidden
+                      className={`h-px flex-1 ${connectorColor} sm:hidden`}
+                    />
+                  ) : null}
+                  <li className="shrink-0">
+                    {isCompleted ? (
+                      <Link href={stepUrl(index)} className={itemClass}>
+                        {numberBadge}
+                        {labelEl}
+                      </Link>
+                    ) : (
+                      <span className={itemClass}>
+                        {numberBadge}
+                        {labelEl}
+                      </span>
+                    )}
+                  </li>
+                </Fragment>
               );
             })}
           </ol>

@@ -41,43 +41,45 @@ export function StepConfirm({
         Proveri detalje i unesi podatke za potvrdu.
       </p>
 
-      <dl className="mt-5 divide-y divide-border rounded-md border border-border bg-card">
-        <div className="flex items-baseline justify-between gap-4 p-4">
-          <dt className="text-sm text-muted-foreground">Usluga</dt>
-          <dd className="text-right font-semibold text-foreground">
-            {service.name}
-          </dd>
+      <div className="mt-5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="bg-brand px-4 py-3 text-brand-foreground">
+          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">
+            Tvoj termin
+          </p>
+          <p className="mt-0.5 text-lg font-semibold">
+            {formatDateLong(date)} · {formatTime(startsAt)}
+          </p>
         </div>
-        <div className="flex items-baseline justify-between gap-4 p-4">
-          <dt className="text-sm text-muted-foreground">Trajanje</dt>
-          <dd className="text-right font-semibold text-foreground">
-            {formatDuration(service.duration_minutes)}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 p-4">
-          <dt className="text-sm text-muted-foreground">Cena</dt>
-          <dd className="text-right font-semibold text-foreground">
-            {formatPrice(service.price)}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 p-4">
-          <dt className="text-sm text-muted-foreground">Termin kod</dt>
-          <dd className="text-right font-semibold text-foreground">
-            {workerName}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 p-4">
-          <dt className="text-sm text-muted-foreground">Termin</dt>
-          <dd className="text-right font-semibold text-foreground">
-            {formatDateLong(date)}
-            <br />
-            <span className="text-base">{formatTime(startsAt)}</span>
-          </dd>
-        </div>
-      </dl>
+        <dl className="divide-y divide-border">
+          <div className="flex items-baseline justify-between gap-4 p-4">
+            <dt className="text-sm text-muted-foreground">Usluga</dt>
+            <dd className="text-right font-semibold text-foreground">
+              {service.name}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 p-4">
+            <dt className="text-sm text-muted-foreground">Trajanje</dt>
+            <dd className="text-right font-semibold text-foreground">
+              {formatDuration(service.duration_minutes)}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 p-4">
+            <dt className="text-sm text-muted-foreground">Cena</dt>
+            <dd className="text-right font-semibold text-brand">
+              {formatPrice(service.price)}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 p-4">
+            <dt className="text-sm text-muted-foreground">Termin kod</dt>
+            <dd className="text-right font-semibold text-foreground">
+              {workerName}
+            </dd>
+          </div>
+        </dl>
+      </div>
 
       {error ? (
-        <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+        <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
           {error}
         </div>
       ) : null}
@@ -99,7 +101,7 @@ export function StepConfirm({
             name="client_name"
             required
             autoComplete="name"
-            className="min-h-12 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="min-h-12 w-full rounded-lg border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </div>
         <div className="space-y-2">
@@ -115,7 +117,7 @@ export function StepConfirm({
             required
             inputMode="tel"
             autoComplete="tel"
-            className="min-h-12 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="min-h-12 w-full rounded-lg border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </div>
         <div className="space-y-2">
@@ -131,7 +133,7 @@ export function StepConfirm({
             type="email"
             required
             autoComplete="email"
-            className="min-h-12 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="min-h-12 w-full rounded-lg border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </div>
         <div className="space-y-2">
@@ -145,13 +147,13 @@ export function StepConfirm({
             id="notes"
             name="notes"
             rows={3}
-            className="w-full rounded-md border border-input bg-background px-3 py-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="w-full rounded-lg border border-input bg-background px-3 py-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </div>
 
         <button
           type="submit"
-          className="min-h-12 w-full rounded-md bg-primary px-4 font-semibold text-primary-foreground transition hover:opacity-90"
+          className="btn-primary min-h-12 w-full rounded-xl px-4 font-semibold text-primary-foreground"
         >
           Zakaži termin
         </button>

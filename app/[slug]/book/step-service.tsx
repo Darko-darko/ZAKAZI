@@ -33,22 +33,45 @@ export function StepService({ slug, workerParam, services }: StepServiceProps) {
                 worker: workerParam,
                 service: service.id,
               })}
-              className="flex items-start justify-between gap-4 rounded-md border border-border bg-card p-4 transition hover:border-primary hover:ring-2 hover:ring-primary/15"
+              className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-xl border border-border bg-card p-4 pl-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
             >
+              <span
+                aria-hidden
+                className="absolute left-0 top-0 h-full w-1 bg-brand-soft transition group-hover:bg-brand"
+              />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">{service.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                    aria-hidden
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
                   {formatDuration(service.duration_minutes)}
                 </p>
               </div>
-              <p className="shrink-0 text-sm font-semibold text-foreground">
+              <p className="shrink-0 text-base font-semibold text-brand">
                 {formatPrice(service.price)}
               </p>
+              <span
+                aria-hidden
+                className="ml-1 hidden text-brand transition group-hover:translate-x-0.5 sm:inline"
+              >
+                →
+              </span>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="mt-5 rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground">
+        <div className="mt-5 rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
           Ovaj radnik trenutno nema objavljene usluge.
         </div>
       )}

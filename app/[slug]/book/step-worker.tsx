@@ -25,19 +25,38 @@ export function StepWorker({ slug, workers }: StepWorkerProps) {
 
       <Link
         href={buildBookingUrl(slug, { worker: ANY_WORKER })}
-        className="mt-5 flex min-h-14 items-center gap-3 rounded-md border border-border bg-card p-3 transition hover:border-primary hover:ring-2 hover:ring-primary/15"
+        className="group relative mt-5 flex min-h-14 items-center gap-3 overflow-hidden rounded-xl border border-brand/30 bg-brand-soft p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-brand hover:shadow-md"
       >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-bold text-muted-foreground">
-          ?
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-sm">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+            aria-hidden
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-foreground">Bilo ko</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-foreground">Bilo ko</span>
+            <span className="rounded-full bg-warm-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warm-foreground">
+              Najbrže
+            </span>
+          </span>
           <span className="block text-xs text-muted-foreground">
             Najbrži slobodan termin
           </span>
         </span>
-        <span aria-hidden="true" className="text-muted-foreground">
-          ›
+        <span aria-hidden className="text-brand transition group-hover:translate-x-0.5">
+          →
         </span>
       </Link>
 
@@ -46,7 +65,7 @@ export function StepWorker({ slug, workers }: StepWorkerProps) {
           <Link
             key={worker.id}
             href={buildBookingUrl(slug, { worker: worker.id })}
-            className="overflow-hidden rounded-md border border-border bg-card transition hover:border-primary hover:ring-2 hover:ring-primary/15 sm:flex sm:min-h-44 sm:flex-col"
+            className="group overflow-hidden rounded-xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:flex sm:min-h-44 sm:flex-col"
           >
             {worker.photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -56,12 +75,12 @@ export function StepWorker({ slug, workers }: StepWorkerProps) {
                 className="aspect-[4/3] w-full object-cover sm:aspect-square"
               />
             ) : (
-              <span className="flex aspect-[4/3] w-full items-center justify-center bg-muted text-4xl font-bold text-muted-foreground sm:aspect-square">
+              <span className="flex aspect-[4/3] w-full items-center justify-center bg-brand-soft text-4xl font-bold text-brand sm:aspect-square">
                 {worker.name.charAt(0).toUpperCase()}
               </span>
             )}
             <span className="block p-3 text-center sm:flex-1">
-              <span className="block text-lg font-semibold text-foreground">
+              <span className="block text-lg font-semibold text-foreground transition group-hover:text-brand">
                 {worker.name}
               </span>
               {worker.bio ? (
