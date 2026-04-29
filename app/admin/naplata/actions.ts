@@ -19,7 +19,7 @@ export async function claimInvoicePaymentAction(formData: FormData) {
 
   const { data, error } = await supabase.rpc("claim_invoice_payment", {
     p_payment_claim_token: paymentClaimToken,
-    p_payment_proof_url: null,
+    p_payment_proof_url: undefined,
   });
 
   if (error || !data) {

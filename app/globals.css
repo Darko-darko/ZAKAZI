@@ -8,6 +8,9 @@
  * never hardcoded colors like `bg-white` or `text-gray-900`.
  */
 @theme {
+  --font-geist-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(0 0% 9%);
 
@@ -17,7 +20,7 @@
   --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(0 0% 9%);
 
-  --color-primary: hsl(0 0% 9%);
+  --color-primary: hsl(222 47% 25%);
   --color-primary-foreground: hsl(0 0% 98%);
 
   --color-secondary: hsl(0 0% 96.1%);
@@ -34,7 +37,7 @@
 
   --color-border: hsl(0 0% 89.8%);
   --color-input: hsl(0 0% 89.8%);
-  --color-ring: hsl(0 0% 9%);
+  --color-ring: hsl(222 47% 25%);
 
   --color-brand: hsl(174 61% 30%);
   --color-brand-foreground: hsl(0 0% 98%);
@@ -48,4 +51,61 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  box-shadow: 0 1px 2px hsl(222 47% 15% / 0.18), 0 8px 20px hsl(222 47% 20% / 0.12);
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.btn-primary:hover {
+  background: hsl(222 47% 29%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px hsl(222 47% 15% / 0.2), 0 10px 24px hsl(222 47% 20% / 0.16);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid hsl(222 47% 25% / 0.18);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled {
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  border: 1px solid var(--color-border);
+  background: color-mix(in oklab, var(--color-background) 88%, var(--color-secondary) 12%);
+  color: var(--color-foreground);
+  box-shadow: 0 1px 2px hsl(222 20% 20% / 0.04);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.btn-secondary:hover {
+  background: color-mix(in oklab, var(--color-accent) 82%, white 18%);
+  border-color: color-mix(in oklab, var(--color-border) 72%, var(--color-primary) 28%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px hsl(222 20% 20% / 0.08);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid hsl(222 47% 25% / 0.12);
+  outline-offset: 2px;
+}
+
+.btn-secondary:disabled {
+  transform: none;
+  box-shadow: none;
 }
