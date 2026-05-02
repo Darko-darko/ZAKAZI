@@ -4,6 +4,7 @@ import { ManualBookingFilters } from "@/app/admin/_components/manual-booking-fil
 import { getCurrentProvider } from "@/lib/admin/provider";
 import {
   createManualBookingAction,
+  resendBookingConfirmationAction,
   updateBookingStatusAction,
 } from "./actions";
 import {
@@ -35,6 +36,18 @@ type BookingRow = {
 type RiskMarker = {
   count: number;
   lastSeenAt: string;
+};
+
+type BookingEmailLogRow = {
+  booking_id: string;
+  brevo_message_id: string | null;
+  created_at: string;
+  error_message: string | null;
+  recipient_email: string | null;
+  sent_at: string | null;
+  status: string;
+  subject: string | null;
+  trigger_source: string;
 };
 
 type ManualService = {
@@ -124,6 +137,16 @@ function formatSelectedDate(value: string) {
     day: "numeric",
     month: "long",
   }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function formatDateTimeCompact(value: string) {
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    timeZone: "Europe/Belgrade",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function statusLabel(status: string) {
@@ -312,6 +335,18 @@ export default async function AdminBookingsPage({
 
   const { data: bookings } = await bookingsQuery;
   const rows = (bookings ?? []) as BookingRow[];
+  const bookingIds = rows.map((booking) => booking.id);
+  const { data: bookingEmailLogs } = bookingIds.length
+    ? await supabase
+        .from("booking_email_logs")
+        .select(
+          "booking_id, brevo_message_id, created_at, error_message, recipient_email, sent_at, status, subject, trigger_source",
+        )
+        .eq("provider_id", provider.id)
+        .eq("email_type", "confirmation_client")
+        .in("booking_id", bookingIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as BookingEmailLogRow[] };
   const phones = Array.from(
     new Set(rows.map((booking) => booking.client_phone).filter(Boolean)),
   );
@@ -367,6 +402,14 @@ export default async function AdminBookingsPage({
           ? item.starts_at
           : current.lastSeenAt,
     });
+  }
+
+  const latestClientEmailByBooking = new Map<string, BookingEmailLogRow>();
+
+  for (const log of (bookingEmailLogs ?? []) as BookingEmailLogRow[]) {
+    if (!latestClientEmailByBooking.has(log.booking_id)) {
+      latestClientEmailByBooking.set(log.booking_id, log);
+    }
   }
 
   const selectedManualWorker = workers?.find((worker) => worker.id === manualWorker);
@@ -788,6 +831,17 @@ export default async function AdminBookingsPage({
                 booking.id,
                 "confirmed",
               );
+              const resendConfirmation = resendBookingConfirmationAction.bind(
+                null,
+                booking.id,
+              );
+              const latestClientEmail = latestClientEmailByBooking.get(booking.id);
+              const emailStatusTone =
+                latestClientEmail?.status === "sent"
+                  ? "text-emerald-700"
+                  : latestClientEmail?.status === "failed"
+                    ? "text-destructive"
+                    : "text-muted-foreground";
 
               return (
                 <article
@@ -872,6 +926,42 @@ export default async function AdminBookingsPage({
                           </StatusActionButton>
                         </form>
                       ) : null}
+                      <div className="rounded-md border border-border/70 bg-background/80 px-2.5 py-2 text-[11px] leading-5">
+                        <p className={`font-semibold ${emailStatusTone}`}>
+                          {latestClientEmail?.status === "sent"
+                            ? `Email potvrde poslat ${formatDateTimeCompact(latestClientEmail.sent_at ?? latestClientEmail.created_at)}`
+                            : latestClientEmail?.status === "failed"
+                              ? `Email potvrde nije poslat ${formatDateTimeCompact(latestClientEmail.created_at)}`
+                              : latestClientEmail?.status === "skipped"
+                                ? `Email potvrde preskocen ${formatDateTimeCompact(latestClientEmail.created_at)}`
+                                : "Jos nema evidencije o email potvrdi"}
+                        </p>
+                        {latestClientEmail?.recipient_email ? (
+                          <p className="text-muted-foreground">
+                            Za: {latestClientEmail.recipient_email}
+                          </p>
+                        ) : null}
+                        {latestClientEmail?.brevo_message_id ? (
+                          <p className="break-all text-muted-foreground">
+                            Message ID: {latestClientEmail.brevo_message_id}
+                          </p>
+                        ) : null}
+                        {latestClientEmail?.error_message ? (
+                          <p className="text-destructive">
+                            Greska: {latestClientEmail.error_message}
+                          </p>
+                        ) : null}
+                        <form action={resendConfirmation} className="mt-2">
+                          <input
+                            type="hidden"
+                            name="return_to"
+                            value={currentPath}
+                          />
+                          <StatusActionButton confirmMessage="Ponovo poslati potvrdu termina ovom klijentu?">
+                            Re-send potvrdu
+                          </StatusActionButton>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 </article>

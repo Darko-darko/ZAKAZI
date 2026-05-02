@@ -91,9 +91,21 @@ export async function createBookingAction(slug: string, formData: FormData) {
   }
 
   try {
-    await sendBookingEmails(bookingId);
+    const emailResult = await sendBookingEmails(bookingId, {
+      triggerSource: "public_booking",
+    });
+
+    if (emailResult.client?.status === "failed") {
+      console.error("Client booking email nije poslat.", {
+        bookingId,
+        error: emailResult.client.errorMessage,
+      });
+    }
   } catch (emailError) {
-    console.error("Booking je sacuvan, ali email nije poslat.", emailError);
+    console.error("Booking je sacuvan, ali booking email dispatch nije uspeo.", {
+      bookingId,
+      error: emailError,
+    });
   }
 
   redirect(buildBookingUrl(slug, {}) + "?success=1");

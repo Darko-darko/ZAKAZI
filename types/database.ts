@@ -193,6 +193,66 @@ export type Database = {
           },
         ]
       }
+      booking_email_logs: {
+        Row: {
+          booking_id: string
+          brevo_message_id: string | null
+          created_at: string
+          email_type: string
+          error_message: string | null
+          id: string
+          provider_id: string
+          recipient_email: string | null
+          sent_at: string | null
+          status: string
+          subject: string | null
+          trigger_source: string
+        }
+        Insert: {
+          booking_id: string
+          brevo_message_id?: string | null
+          created_at?: string
+          email_type: string
+          error_message?: string | null
+          id?: string
+          provider_id: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status: string
+          subject?: string | null
+          trigger_source: string
+        }
+        Update: {
+          booking_id?: string
+          brevo_message_id?: string | null
+          created_at?: string
+          email_type?: string
+          error_message?: string | null
+          id?: string
+          provider_id?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_email_logs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_email_logs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_counters: {
         Row: {
           last_number: number

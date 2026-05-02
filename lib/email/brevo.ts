@@ -16,6 +16,11 @@ type SendEmailParams = {
   tags?: string[];
 };
 
+export type SendEmailResult = {
+  messageId: string | null;
+  messageIds: string[];
+};
+
 function getBrevoConfig() {
   const apiKey = process.env.BREVO_API_KEY;
   const fromEmail = process.env.BREVO_FROM_EMAIL;
@@ -30,12 +35,12 @@ function getBrevoConfig() {
   return { apiKey, fromEmail, fromName };
 }
 
-export async function sendEmail(params: SendEmailParams): Promise<void> {
+export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   const config = getBrevoConfig();
 
   const client = new BrevoClient({ apiKey: config.apiKey });
 
-  await client.transactionalEmails.sendTransacEmail({
+  const response = await client.transactionalEmails.sendTransacEmail({
     sender: { email: config.fromEmail, name: config.fromName },
     to: params.to,
     subject: params.subject,
@@ -48,4 +53,13 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       content: file.content.toString("base64"),
     })),
   });
+
+  const messageIds =
+    response.messageIds ??
+    (response.messageId ? [response.messageId] : []);
+
+  return {
+    messageId: response.messageId ?? messageIds[0] ?? null,
+    messageIds,
+  };
 }

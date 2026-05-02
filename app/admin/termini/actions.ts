@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { sendBookingEmails } from "@/lib/email/booking";
 import { getCurrentProvider } from "@/lib/admin/provider";
 
 const ALLOWED_STATUSES = new Set(["confirmed", "cancelled", "noshow"]);
@@ -131,6 +132,25 @@ export async function createManualBookingAction(formData: FormData) {
     );
   }
 
+  try {
+    const emailResult = await sendBookingEmails(bookingId, {
+      triggerSource: "admin_manual",
+      sendAdmin: false,
+    });
+
+    if (emailResult.client?.status === "failed") {
+      console.error("Rucno kreiran booking nema poslatu potvrdu klijentu.", {
+        bookingId,
+        error: emailResult.client.errorMessage,
+      });
+    }
+  } catch (emailError) {
+    console.error("Rucno kreiran booking ima neuspesan email dispatch.", {
+      bookingId,
+      error: emailError,
+    });
+  }
+
   const search = new URLSearchParams();
   search.set("date", manualDate);
   search.set("status", "active");
@@ -139,4 +159,31 @@ export async function createManualBookingAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/termini");
   redirect(`/admin/termini?${search.toString()}#${BOOKINGS_OVERVIEW_ID}`);
+}
+
+export async function resendBookingConfirmationAction(
+  bookingId: string,
+  formData: FormData,
+) {
+  const { supabase, provider } = await getCurrentProvider();
+  const returnTo = readString(formData, "return_to") || "/admin/termini";
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("id", bookingId)
+    .eq("provider_id", provider.id)
+    .maybeSingle();
+
+  if (!booking) {
+    throw new Error("Termin nije pronadjen.");
+  }
+
+  await sendBookingEmails(bookingId, {
+    triggerSource: "resend",
+    sendAdmin: false,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/termini");
+  redirect(returnTo);
 }
