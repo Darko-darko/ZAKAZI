@@ -553,7 +553,7 @@ async function recordBookingEmailLog(params: {
 }) {
   try {
     const admin = createAdminClient();
-    await admin.from("booking_email_logs").insert({
+    const { error } = await admin.from("booking_email_logs").insert({
       booking_id: params.context.id,
       provider_id: params.context.providerId,
       email_type: params.emailType,
@@ -566,6 +566,15 @@ async function recordBookingEmailLog(params: {
       sent_at:
         params.status === "sent" ? new Date().toISOString() : null,
     });
+
+    if (error) {
+      console.error("Upis booking email loga nije uspeo.", {
+        bookingId: params.context.id,
+        emailType: params.emailType,
+        triggerSource: params.triggerSource,
+        error: error.message,
+      });
+    }
   } catch (error) {
     console.error("Upis booking email loga nije uspeo.", error);
   }

@@ -336,7 +336,7 @@ export default async function AdminBookingsPage({
   const { data: bookings } = await bookingsQuery;
   const rows = (bookings ?? []) as BookingRow[];
   const bookingIds = rows.map((booking) => booking.id);
-  const { data: bookingEmailLogs } = bookingIds.length
+  const { data: bookingEmailLogs, error: bookingEmailLogsError } = bookingIds.length
     ? await supabase
         .from("booking_email_logs")
         .select(
@@ -346,7 +346,7 @@ export default async function AdminBookingsPage({
         .eq("email_type", "confirmation_client")
         .in("booking_id", bookingIds)
         .order("created_at", { ascending: false })
-    : { data: [] as BookingEmailLogRow[] };
+    : { data: [] as BookingEmailLogRow[], error: null };
   const phones = Array.from(
     new Set(rows.map((booking) => booking.client_phone).filter(Boolean)),
   );
@@ -792,6 +792,11 @@ export default async function AdminBookingsPage({
         </form>
 
         <div className="space-y-3">
+          {bookingEmailLogsError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              Evidencija booking emailova trenutno nije dostupna: {bookingEmailLogsError.message}
+            </div>
+          ) : null}
           {rows.length ? (
             rows.map((booking) => {
               const phoneRisk = riskByPhone.get(booking.client_phone);
@@ -929,26 +934,21 @@ export default async function AdminBookingsPage({
                       <div className="rounded-md border border-border/70 bg-background/80 px-2.5 py-2 text-[11px] leading-5">
                         <p className={`font-semibold ${emailStatusTone}`}>
                           {latestClientEmail?.status === "sent"
-                            ? `Email potvrde poslat ${formatDateTimeCompact(latestClientEmail.sent_at ?? latestClientEmail.created_at)}`
+                            ? `Potvrda je poslata ${formatDateTimeCompact(latestClientEmail.sent_at ?? latestClientEmail.created_at)}`
                             : latestClientEmail?.status === "failed"
-                              ? `Email potvrde nije poslat ${formatDateTimeCompact(latestClientEmail.created_at)}`
+                              ? `Potvrda nije poslata ${formatDateTimeCompact(latestClientEmail.created_at)}`
                               : latestClientEmail?.status === "skipped"
-                                ? `Email potvrde preskocen ${formatDateTimeCompact(latestClientEmail.created_at)}`
-                                : "Jos nema evidencije o email potvrdi"}
+                                ? `Slanje potvrde je preskoceno ${formatDateTimeCompact(latestClientEmail.created_at)}`
+                                : "Jos nema potvrde o slanju emaila"}
                         </p>
                         {latestClientEmail?.recipient_email ? (
                           <p className="text-muted-foreground">
-                            Za: {latestClientEmail.recipient_email}
-                          </p>
-                        ) : null}
-                        {latestClientEmail?.brevo_message_id ? (
-                          <p className="break-all text-muted-foreground">
-                            Message ID: {latestClientEmail.brevo_message_id}
+                            Primalac: {latestClientEmail.recipient_email}
                           </p>
                         ) : null}
                         {latestClientEmail?.error_message ? (
                           <p className="text-destructive">
-                            Greska: {latestClientEmail.error_message}
+                            Slanje nije uspelo. Probaj ponovo.
                           </p>
                         ) : null}
                         <form action={resendConfirmation} className="mt-2">
