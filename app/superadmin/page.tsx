@@ -1,11 +1,23 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/auth/actions";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
-import { confirmInvoicePaymentAction } from "./actions";
+import {
+  confirmInvoicePaymentAction,
+  issueTestInvoiceAction,
+  updatePlatformSettingsAction,
+} from "./actions";
 
 export const metadata = {
   title: "Super Admin | zakazi.pro",
 };
+
+type SuperAdminPageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 type ProviderRow = {
   id: string;
@@ -97,7 +109,14 @@ function invoiceTone(invoice: InvoiceRow) {
   };
 }
 
-export default async function SuperAdminPage() {
+export default async function SuperAdminPage({
+  searchParams,
+}: SuperAdminPageProps) {
+  const query = await searchParams;
+  const notice = firstParam(query.notice) ?? "";
+  const error = firstParam(query.error) ?? "";
+  const noticeNumber = firstParam(query.number) ?? "";
+  const errorReason = firstParam(query.reason) ?? "";
   const { admin } = await requireSuperAdmin();
 
   const [
@@ -106,6 +125,7 @@ export default async function SuperAdminPage() {
     { data: pendingCommissions },
     { data: invoices },
     { data: agents },
+    { data: platformRow },
   ] = await Promise.all([
     admin.from("agents").select("*", { count: "exact", head: true }),
     admin
@@ -124,7 +144,30 @@ export default async function SuperAdminPage() {
       .neq("status", "cancelled")
       .order("created_at", { ascending: false }),
     admin.from("agents").select("id, name"),
+    admin
+      .from("platform_settings")
+      .select(
+        "company_legal_name, company_pib, company_mb, company_address, company_city, company_zip, bank_name, account_number, iban, is_vat_payer, vat_rate, contact_email, contact_phone",
+      )
+      .eq("id", 1)
+      .maybeSingle(),
   ]);
+
+  const platform = platformRow ?? {
+    company_legal_name: null,
+    company_pib: null,
+    company_mb: null,
+    company_address: null,
+    company_city: null,
+    company_zip: null,
+    bank_name: null,
+    account_number: null,
+    iban: null,
+    is_vat_payer: false,
+    vat_rate: 20,
+    contact_email: null,
+    contact_phone: null,
+  };
 
   const providerRows = (providers ?? []) as ProviderRow[];
   const invoiceRows = (invoices ?? []) as InvoiceRow[];
@@ -191,6 +234,51 @@ export default async function SuperAdminPage() {
             </button>
           </form>
         </header>
+
+        {notice === "platform-saved" ? (
+          <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
+            Podaci platforme su sacuvani.
+          </div>
+        ) : null}
+
+        {error === "platform-save-failed" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Cuvanje podataka platforme nije uspelo. Pokusaj ponovo.
+          </div>
+        ) : null}
+
+        {error === "invalid-pib" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            PIB mora imati tacno 9 cifara.
+          </div>
+        ) : null}
+
+        {error === "invalid-mb" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Maticni broj mora imati tacno 8 cifara.
+          </div>
+        ) : null}
+
+        {notice === "invoice-issued" && noticeNumber ? (
+          <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
+            Faktura {noticeNumber} je generisana, sacuvana u storage i poslata na email.
+          </div>
+        ) : null}
+
+        {error === "invoice-failed" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Generisanje fakture nije uspelo.
+            {errorReason ? (
+              <span className="ml-1 font-normal">{errorReason}</span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {error === "missing-provider" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Nedostaje identifikacija salona.
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-md border border-border bg-card p-5">
@@ -355,6 +443,28 @@ export default async function SuperAdminPage() {
                           >
                             Otvori mini sajt
                           </Link>
+
+                          <Link
+                            href={`/api/superadmin/invoice-preview?provider_id=${provider.id}`}
+                            target="_blank"
+                            className="btn-secondary mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
+                          >
+                            Pregled PDF-a
+                          </Link>
+
+                          <form action={issueTestInvoiceAction} className="mt-2">
+                            <input
+                              type="hidden"
+                              name="provider_id"
+                              value={provider.id}
+                            />
+                            <button
+                              type="submit"
+                              className="btn-secondary inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
+                            >
+                              Generisi test fakturu (DB + email)
+                            </button>
+                          </form>
                         </div>
                       </div>
                     </div>
@@ -401,6 +511,273 @@ export default async function SuperAdminPage() {
               Jos nema registrovanih salona.
             </div>
           )}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-foreground">
+              Podaci platforme za fakturisanje
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Ovi podaci se stampaju kao izdavalac na svakoj fakturi koju
+              zakazi.pro izdaje salonima.
+            </p>
+          </div>
+
+          <form action={updatePlatformSettingsAction} className="mt-6 space-y-5">
+            <div className="space-y-2">
+              <label
+                htmlFor="company_legal_name"
+                className="text-sm font-medium text-foreground"
+              >
+                Pravni naziv firme
+              </label>
+              <input
+                id="company_legal_name"
+                name="company_legal_name"
+                defaultValue={platform.company_legal_name ?? ""}
+                placeholder="zakazi.pro DOO"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_pib"
+                  className="text-sm font-medium text-foreground"
+                >
+                  PIB (9 cifara)
+                </label>
+                <input
+                  id="company_pib"
+                  name="company_pib"
+                  inputMode="numeric"
+                  pattern="\d{9}"
+                  maxLength={9}
+                  defaultValue={platform.company_pib ?? ""}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_mb"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Maticni broj (8 cifara)
+                </label>
+                <input
+                  id="company_mb"
+                  name="company_mb"
+                  inputMode="numeric"
+                  pattern="\d{8}"
+                  maxLength={8}
+                  defaultValue={platform.company_mb ?? ""}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="company_address"
+                className="text-sm font-medium text-foreground"
+              >
+                Adresa sedista
+              </label>
+              <input
+                id="company_address"
+                name="company_address"
+                defaultValue={platform.company_address ?? ""}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_city"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Grad
+                </label>
+                <input
+                  id="company_city"
+                  name="company_city"
+                  defaultValue={platform.company_city ?? ""}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_zip"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Postanski broj
+                </label>
+                <input
+                  id="company_zip"
+                  name="company_zip"
+                  inputMode="numeric"
+                  defaultValue={platform.company_zip ?? ""}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <h3 className="text-base font-semibold text-foreground">
+                Bankovni racun
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Prikazuje se na fakturi sa pozivom na broj fakture.
+              </p>
+
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="bank_name"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Naziv banke
+                    </label>
+                    <input
+                      id="bank_name"
+                      name="bank_name"
+                      defaultValue={platform.bank_name ?? ""}
+                      placeholder="Banca Intesa"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="account_number"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Ziro racun
+                    </label>
+                    <input
+                      id="account_number"
+                      name="account_number"
+                      defaultValue={platform.account_number ?? ""}
+                      placeholder="160-0000000000000-00"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="iban"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    IBAN (opciono)
+                  </label>
+                  <input
+                    id="iban"
+                    name="iban"
+                    defaultValue={platform.iban ?? ""}
+                    placeholder="RS35260005601001611379"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <h3 className="text-base font-semibold text-foreground">PDV</h3>
+
+              <div className="mt-4 space-y-4">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    name="is_vat_payer"
+                    defaultChecked={platform.is_vat_payer}
+                    className="mt-1 size-4 rounded border-input text-primary focus:ring-2 focus:ring-ring/20"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">
+                      Obveznik sam PDV-a
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Ako je oznaceno, PDV se obracunava i prikazuje na fakturi.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="vat_rate"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Stopa PDV-a (%)
+                  </label>
+                  <input
+                    id="vat_rate"
+                    name="vat_rate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    defaultValue={platform.vat_rate ?? 20}
+                    className="w-full max-w-[10rem] rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <h3 className="text-base font-semibold text-foreground">
+                Kontakt na fakturi
+              </h3>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="contact_email"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="contact_email"
+                    name="contact_email"
+                    type="email"
+                    defaultValue={platform.contact_email ?? ""}
+                    placeholder="podrska@zakazi.pro"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="contact_phone"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Telefon
+                  </label>
+                  <input
+                    id="contact_phone"
+                    name="contact_phone"
+                    defaultValue={platform.contact_phone ?? ""}
+                    placeholder="+381 21 000 000"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary inline-flex min-h-11 items-center justify-center rounded-lg px-5 text-sm font-semibold text-primary-foreground"
+            >
+              Sacuvaj podatke platforme
+            </button>
+          </form>
         </section>
       </section>
     </main>

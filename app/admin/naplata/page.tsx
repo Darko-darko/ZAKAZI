@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
-import { claimInvoicePaymentAction } from "./actions";
+import { claimInvoicePaymentAction, updateBillingDetailsAction } from "./actions";
 
 export const metadata = {
   title: "Naplata | zakazi.pro",
@@ -92,15 +92,33 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const notice = firstParam(query.notice) ?? "";
   const error = firstParam(query.error) ?? "";
   const { supabase, provider } = await getCurrentProvider();
-  const { data } = await supabase
-    .from("invoices")
-    .select(
-      "id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_claim_token, pdf_url, created_at",
-    )
-    .eq("provider_id", provider.id)
-    .neq("status", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const [{ data }, { data: billingRow }] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select(
+        "id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_claim_token, pdf_url, created_at",
+      )
+      .eq("provider_id", provider.id)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("providers")
+      .select(
+        "company_name, company_pib, company_mb, company_address, company_city, company_zip, billing_email",
+      )
+      .eq("id", provider.id)
+      .maybeSingle(),
+  ]);
+  const billing = billingRow ?? {
+    company_name: null,
+    company_pib: null,
+    company_mb: null,
+    company_address: null,
+    company_city: null,
+    company_zip: null,
+    billing_email: null,
+  };
 
   const invoices = (data ?? []) as InvoiceRow[];
   const currentInvoice =
@@ -120,6 +138,35 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       (currentInvoice.status === "issued" || currentInvoice.status === "overdue") &&
       !currentInvoice.payment_claimed_at,
   );
+
+  const billingRequiredFields = [
+    { key: "company_name", label: "Pravni naziv firme", value: billing.company_name },
+    { key: "company_pib", label: "PIB", value: billing.company_pib },
+    { key: "company_mb", label: "Maticni broj", value: billing.company_mb },
+    { key: "company_address", label: "Adresa sedista", value: billing.company_address },
+    { key: "company_city", label: "Grad", value: billing.company_city },
+    { key: "company_zip", label: "Postanski broj", value: billing.company_zip },
+    { key: "billing_email", label: "Email za prijem faktura", value: billing.billing_email },
+  ] as const;
+  const missingBillingFields = billingRequiredFields.filter(
+    (field) => !field.value,
+  );
+  const billingComplete = missingBillingFields.length === 0;
+
+  const pdfStoragePaths = invoices
+    .map((invoice) => invoice.pdf_url)
+    .filter((value): value is string => Boolean(value));
+  const signedUrlByPath = new Map<string, string>();
+  if (pdfStoragePaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("invoices")
+      .createSignedUrls(pdfStoragePaths, 3600);
+    for (const item of signed ?? []) {
+      if (item.path && item.signedUrl) {
+        signedUrlByPath.set(item.path, item.signedUrl);
+      }
+    }
+  }
 
   return (
     <main className="flex flex-1 px-4 py-6 sm:px-6 sm:py-10">
@@ -162,6 +209,47 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         {error === "missing-token" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
             Nedostaje identifikacija fakture za prijavu uplate.
+          </div>
+        ) : null}
+
+        {notice === "billing-saved" ? (
+          <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
+            Podaci za fakturisanje su sacuvani.
+          </div>
+        ) : null}
+
+        {error === "billing-save-failed" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Cuvanje podataka za fakturisanje nije uspelo. Pokusaj ponovo.
+          </div>
+        ) : null}
+
+        {error === "invalid-pib" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            PIB mora imati tacno 9 cifara.
+          </div>
+        ) : null}
+
+        {error === "invalid-mb" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Maticni broj mora imati tacno 8 cifara.
+          </div>
+        ) : null}
+
+        {!billingComplete ? (
+          <div className="rounded-xl border border-warm/40 bg-warm-soft px-4 py-3 text-sm text-foreground">
+            <p className="font-semibold">
+              Podaci za fakturisanje nisu kompletni.
+            </p>
+            <p className="mt-1">
+              Popuni sledeca polja ispod kako bi ti zakazi.pro mogao izdati
+              validnu fakturu:
+            </p>
+            <ul className="mt-2 list-disc space-y-0.5 pl-5">
+              {missingBillingFields.map((field) => (
+                <li key={field.key}>{field.label}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
@@ -267,11 +355,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           {invoices.length ? (
             <div className="mt-4 space-y-3">
               {invoices.map((invoice) => {
-                const accountantHref = provider.billing_email
-                  ? `mailto:${provider.billing_email}?subject=Faktura%20${encodeURIComponent(invoice.number)}&body=${encodeURIComponent(
-                      invoice.pdf_url ?? "Faktura jos nema PDF link.",
-                    )}`
+                const signedPdfUrl = invoice.pdf_url
+                  ? signedUrlByPath.get(invoice.pdf_url) ?? null
                   : null;
+                const accountantHref =
+                  provider.billing_email && signedPdfUrl
+                    ? `mailto:${provider.billing_email}?subject=Faktura%20${encodeURIComponent(invoice.number)}&body=${encodeURIComponent(signedPdfUrl)}`
+                    : null;
 
                 return (
                   <article
@@ -290,13 +380,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {invoice.pdf_url ? (
+                        {signedPdfUrl ? (
                           <Link
-                            href={invoice.pdf_url}
+                            href={signedPdfUrl}
                             target="_blank"
                             className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
                           >
-                            Download PDF
+                            Preuzmi PDF
                           </Link>
                         ) : (
                           <div className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground">
@@ -323,6 +413,154 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               Jos nema izdatih faktura.
             </div>
           )}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              Podaci za fakturisanje
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Ovi podaci se stampaju na fakturi koju ti zakazi.pro izdaje.
+              Promenom ovih polja menjaju se i sledece fakture.
+            </p>
+          </div>
+
+          <form action={updateBillingDetailsAction} className="mt-5 space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="company_name"
+                className="text-sm font-medium text-foreground"
+              >
+                Pravni naziv firme
+              </label>
+              <input
+                id="company_name"
+                name="company_name"
+                defaultValue={billing.company_name ?? ""}
+                placeholder="npr. Salon Mica DOO"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_pib"
+                  className="text-sm font-medium text-foreground"
+                >
+                  PIB (9 cifara)
+                </label>
+                <input
+                  id="company_pib"
+                  name="company_pib"
+                  inputMode="numeric"
+                  pattern="\d{9}"
+                  maxLength={9}
+                  defaultValue={billing.company_pib ?? ""}
+                  placeholder="123456789"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_mb"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Maticni broj (8 cifara)
+                </label>
+                <input
+                  id="company_mb"
+                  name="company_mb"
+                  inputMode="numeric"
+                  pattern="\d{8}"
+                  maxLength={8}
+                  defaultValue={billing.company_mb ?? ""}
+                  placeholder="12345678"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="company_address"
+                className="text-sm font-medium text-foreground"
+              >
+                Adresa sedista
+              </label>
+              <input
+                id="company_address"
+                name="company_address"
+                defaultValue={billing.company_address ?? ""}
+                placeholder="Bulevar oslobodjenja 1"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_city"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Grad
+                </label>
+                <input
+                  id="company_city"
+                  name="company_city"
+                  defaultValue={billing.company_city ?? ""}
+                  placeholder="Novi Sad"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="company_zip"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Postanski broj
+                </label>
+                <input
+                  id="company_zip"
+                  name="company_zip"
+                  inputMode="numeric"
+                  defaultValue={billing.company_zip ?? ""}
+                  placeholder="21000"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="billing_email"
+                className="text-sm font-medium text-foreground"
+              >
+                Email za prijem faktura
+              </label>
+              <input
+                id="billing_email"
+                name="billing_email"
+                type="email"
+                defaultValue={billing.billing_email ?? ""}
+                placeholder="racuni@salon-mica.rs"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+              />
+              <p className="text-xs text-muted-foreground">
+                Na ovaj email ti zakazi.pro salje fakturu sa PDF-om u prilogu.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary inline-flex min-h-11 items-center justify-center rounded-lg px-5 text-sm font-semibold text-primary-foreground"
+            >
+              Sacuvaj podatke
+            </button>
+          </form>
         </section>
       </section>
     </main>

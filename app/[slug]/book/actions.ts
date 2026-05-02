@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { sendBookingEmails } from "@/lib/email/booking";
 import { createClient } from "@/lib/supabase/server";
 import { ANY_WORKER, buildBookingUrl } from "./utils";
 
@@ -87,6 +88,12 @@ export async function createBookingAction(slug: string, formData: FormData) {
       "Termin više nije slobodan. Izaberi drugi termin.",
       formData,
     );
+  }
+
+  try {
+    await sendBookingEmails(bookingId);
+  } catch (emailError) {
+    console.error("Booking je sacuvan, ali email nije poslat.", emailError);
   }
 
   redirect(buildBookingUrl(slug, {}) + "?success=1");

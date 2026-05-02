@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       agent_commissions: {
@@ -355,6 +330,60 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          account_number: string | null
+          bank_name: string | null
+          company_address: string | null
+          company_city: string | null
+          company_legal_name: string | null
+          company_mb: string | null
+          company_pib: string | null
+          company_zip: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          iban: string | null
+          id: number
+          is_vat_payer: boolean
+          updated_at: string
+          vat_rate: number
+        }
+        Insert: {
+          account_number?: string | null
+          bank_name?: string | null
+          company_address?: string | null
+          company_city?: string | null
+          company_legal_name?: string | null
+          company_mb?: string | null
+          company_pib?: string | null
+          company_zip?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          iban?: string | null
+          id?: number
+          is_vat_payer?: boolean
+          updated_at?: string
+          vat_rate?: number
+        }
+        Update: {
+          account_number?: string | null
+          bank_name?: string | null
+          company_address?: string | null
+          company_city?: string | null
+          company_legal_name?: string | null
+          company_mb?: string | null
+          company_pib?: string | null
+          company_zip?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          iban?: string | null
+          id?: number
+          is_vat_payer?: boolean
+          updated_at?: string
+          vat_rate?: number
+        }
+        Relationships: []
+      }
       provider_gallery: {
         Row: {
           created_at: string
@@ -433,9 +462,13 @@ export type Database = {
           cancel_min_hours: number
           city: string | null
           company_address: string | null
+          company_city: string | null
           company_mb: string | null
           company_name: string | null
           company_pib: string | null
+          company_zip: string | null
+          cover_focal_x: number
+          cover_focal_y: number
           cover_url: string | null
           created_at: string
           custom_domain: string | null
@@ -446,6 +479,7 @@ export type Database = {
           id: string
           instagram_url: string | null
           intro_text: string | null
+          is_vat_payer: boolean
           logo_url: string | null
           name: string
           phone: string | null
@@ -471,9 +505,13 @@ export type Database = {
           cancel_min_hours?: number
           city?: string | null
           company_address?: string | null
+          company_city?: string | null
           company_mb?: string | null
           company_name?: string | null
           company_pib?: string | null
+          company_zip?: string | null
+          cover_focal_x?: number
+          cover_focal_y?: number
           cover_url?: string | null
           created_at?: string
           custom_domain?: string | null
@@ -484,6 +522,7 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           intro_text?: string | null
+          is_vat_payer?: boolean
           logo_url?: string | null
           name: string
           phone?: string | null
@@ -509,9 +548,13 @@ export type Database = {
           cancel_min_hours?: number
           city?: string | null
           company_address?: string | null
+          company_city?: string | null
           company_mb?: string | null
           company_name?: string | null
           company_pib?: string | null
+          company_zip?: string | null
+          cover_focal_x?: number
+          cover_focal_y?: number
           cover_url?: string | null
           created_at?: string
           custom_domain?: string | null
@@ -522,6 +565,7 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           intro_text?: string | null
+          is_vat_payer?: boolean
           logo_url?: string | null
           name?: string
           phone?: string | null
@@ -961,6 +1005,8 @@ export type Database = {
           booking_min_notice_hours: number
           cancel_min_hours: number
           city: string
+          cover_focal_x: number
+          cover_focal_y: number
           cover_url: string
           custom_domain: string
           description: string
@@ -1156,9 +1202,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
