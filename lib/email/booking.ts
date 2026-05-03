@@ -224,6 +224,17 @@ function renderInfoRow(label: string, value: string) {
   `;
 }
 
+function renderStackedInfoItem(label: string, value: string) {
+  return `
+    <div style="padding: 12px 0; border-top: 1px solid #e2e8f0;">
+      <p style="margin: 0 0 6px; font-size: 13px; color: #64748b;">${escapeHtml(label)}</p>
+      <p style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 700; color: #0f172a; word-break: break-word; overflow-wrap: anywhere;">
+        ${escapeHtml(value)}
+      </p>
+    </div>
+  `;
+}
+
 function renderButton(label: string, href: string) {
   return `
     <a
@@ -425,8 +436,17 @@ function buildClientBookingText(context: BookingEmailContext) {
 }
 
 function buildAdminBookingEmail(context: BookingEmailContext) {
+  const notesBlock = context.notes
+    ? `
+      <div style="margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #0f172a;">Napomena klijenta</p>
+        <p style="margin: 0; color: #334155; line-height: 1.6; word-break: break-word; overflow-wrap: anywhere;">${escapeHtml(context.notes)}</p>
+      </div>
+    `
+    : "";
+
   return `
-    <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
+    <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px 16px; background: #f8fafc;">
       <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #0f766e;">
         Novo zakazivanje
       </p>
@@ -434,19 +454,29 @@ function buildAdminBookingEmail(context: BookingEmailContext) {
       <p style="margin: 0 0 18px; color: #334155;">
         Klijent <strong>${escapeHtml(context.clientName)}</strong> je upravo zakazao termin preko javne booking stranice.
       </p>
-      <div style="border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px 18px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          ${renderInfoRow("Termin", formatDateTime(context.startsAt))}
-          ${renderInfoRow("Usluga", context.serviceName)}
-          ${renderInfoRow("Radnik", context.workerName)}
-          ${renderInfoRow("Trajanje", formatDuration(context.serviceDurationMinutes))}
-          ${renderInfoRow("Cena", formatPrice(context.servicePrice))}
-          ${renderInfoRow("Klijent", context.clientName)}
-          ${renderInfoRow("Telefon", context.clientPhone)}
-          ${renderInfoRow("Email", context.clientEmail ?? "Nije unet")}
-          ${renderInfoRow("Napomena", context.notes || "Nema")}
-        </table>
+      <div style="border-radius: 18px; border: 1px solid #e2e8f0; background: #ffffff; overflow: hidden;">
+        <div style="padding: 16px 18px; background: #0f172a; color: #f8fafc;">
+          <p style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #99f6e4;">
+            Termin
+          </p>
+          <p style="margin: 8px 0 0; font-size: 22px; line-height: 1.35; font-weight: 700; word-break: break-word;">
+            ${escapeHtml(formatDateTime(context.startsAt))}
+          </p>
+          <p style="margin: 8px 0 0; font-size: 14px; color: #cbd5e1;">
+            ${escapeHtml(`${formatTime(context.startsAt)} - ${formatTime(context.endsAt)}`)}
+          </p>
+        </div>
+        <div style="padding: 0 18px 16px;">
+          ${renderStackedInfoItem("Usluga", context.serviceName)}
+          ${renderStackedInfoItem("Radnik", context.workerName)}
+          ${renderStackedInfoItem("Trajanje", formatDuration(context.serviceDurationMinutes))}
+          ${renderStackedInfoItem("Cena", formatPrice(context.servicePrice))}
+          ${renderStackedInfoItem("Klijent", context.clientName)}
+          ${renderStackedInfoItem("Telefon", context.clientPhone)}
+          ${renderStackedInfoItem("Email", context.clientEmail ?? "Nije unet")}
+        </div>
       </div>
+      ${notesBlock}
       <p style="margin-top: 24px; color: #64748b; font-size: 13px;">
         Provera i dalje upravljanje terminom rade se kroz admin panel.
       </p>
@@ -509,20 +539,27 @@ function buildClientCancellationText(context: BookingEmailContext) {
 
 function buildAdminCancellationEmail(context: BookingEmailContext) {
   return `
-    <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
+    <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px 16px; background: #f8fafc;">
       <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #b45309;">
         Klijent je otkazao termin
       </p>
       <h1 style="margin: 0 0 16px; font-size: 24px; line-height: 1.25;">Termin je otkazan sa javne strane</h1>
-      <div style="border-radius: 18px; border: 1px solid #e2e8f0; padding: 16px 18px;">
-        <table style="width: 100%; border-collapse: collapse;">
-          ${renderInfoRow("Termin", formatDateTime(context.startsAt))}
-          ${renderInfoRow("Usluga", context.serviceName)}
-          ${renderInfoRow("Radnik", context.workerName)}
-          ${renderInfoRow("Klijent", context.clientName)}
-          ${renderInfoRow("Telefon", context.clientPhone)}
-          ${renderInfoRow("Email", context.clientEmail ?? "Nije unet")}
-        </table>
+      <div style="border-radius: 18px; border: 1px solid #e2e8f0; background: #ffffff; overflow: hidden;">
+        <div style="padding: 16px 18px; background: #7c2d12; color: #fef2f2;">
+          <p style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #fdba74;">
+            Termin
+          </p>
+          <p style="margin: 8px 0 0; font-size: 22px; line-height: 1.35; font-weight: 700; word-break: break-word;">
+            ${escapeHtml(formatDateTime(context.startsAt))}
+          </p>
+        </div>
+        <div style="padding: 0 18px 16px;">
+          ${renderStackedInfoItem("Usluga", context.serviceName)}
+          ${renderStackedInfoItem("Radnik", context.workerName)}
+          ${renderStackedInfoItem("Klijent", context.clientName)}
+          ${renderStackedInfoItem("Telefon", context.clientPhone)}
+          ${renderStackedInfoItem("Email", context.clientEmail ?? "Nije unet")}
+        </div>
       </div>
     </div>
   `;
