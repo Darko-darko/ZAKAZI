@@ -64,6 +64,19 @@ type ManualSlot = {
   ends_at: string;
 };
 
+type SetupStep = {
+  key:
+    | "services"
+    | "workers"
+    | "worker_services"
+    | "working_hours"
+    | "worker_schedule";
+  label: string;
+  description: string;
+  href: string;
+  done: boolean;
+};
+
 const STATUS_LABELS: Record<string, string> = {
   active: "Zakazani",
   confirmed: "Zakazan",
@@ -240,6 +253,14 @@ function buildFilterUrl(params: {
   });
 }
 
+function setupProgressWidth(completed: number, total: number) {
+  if (total <= 0) {
+    return "0%";
+  }
+
+  return `${Math.round((completed / total) * 100)}%`;
+}
+
 export default async function AdminBookingsPage({
   searchParams,
 }: AdminBookingsPageProps) {
@@ -262,6 +283,10 @@ export default async function AdminBookingsPage({
 
   const [
     { data: workers },
+    { data: services },
+    { data: workerServices },
+    { data: workingHours },
+    { data: workerSchedules },
     { count: todayActiveCount },
     { count: tomorrowActiveCount },
   ] = await Promise.all([
@@ -271,6 +296,21 @@ export default async function AdminBookingsPage({
       .eq("provider_id", provider.id)
       .is("archived_at", null)
       .order("created_at"),
+    supabase
+      .from("services")
+      .select("id, is_active")
+      .eq("provider_id", provider.id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("worker_services")
+      .select("worker_id, service_id"),
+    supabase
+      .from("provider_working_hours")
+      .select("id, is_closed")
+      .eq("provider_id", provider.id),
+    supabase
+      .from("worker_schedule")
+      .select("id, worker_id"),
     supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })
@@ -286,6 +326,62 @@ export default async function AdminBookingsPage({
       .lte("starts_at", tomorrowBounds.to)
       .in("status", ["pending", "confirmed", "noshow"]),
   ]);
+
+  const workerIds = new Set((workers ?? []).map((worker) => worker.id));
+  const serviceIds = new Set(
+    (services ?? [])
+      .filter((service) => service.is_active)
+      .map((service) => service.id),
+  );
+  const hasWorkerServiceAssignments = (workerServices ?? []).some(
+    (assignment) =>
+      workerIds.has(assignment.worker_id) && serviceIds.has(assignment.service_id),
+  );
+  const hasOpenWorkingHours = (workingHours ?? []).some(
+    (row) => row.is_closed === false,
+  );
+  const hasWorkerSchedule = (workerSchedules ?? []).some((row) =>
+    workerIds.has(row.worker_id),
+  );
+  const setupSteps: SetupStep[] = [
+    {
+      key: "services",
+      label: "Aktivne usluge",
+      description: "Potrebna je bar jedna aktivna usluga da bi klijent imao sta da zakaze.",
+      href: "/admin/usluge",
+      done: serviceIds.size > 0,
+    },
+    {
+      key: "workers",
+      label: "Dostupni radnici",
+      description: "Potreban je bar jedan radnik koji moze da prima online termine.",
+      href: "/admin/radnici",
+      done: workerIds.size > 0,
+    },
+    {
+      key: "worker_services",
+      label: "Povezane usluge",
+      description: "Svaki radnik treba da ima dodeljene usluge koje stvarno radi.",
+      href: "/admin/radnici",
+      done: hasWorkerServiceAssignments,
+    },
+    {
+      key: "working_hours",
+      label: "Radno vreme",
+      description: "Ovo je osnovni okvir u kom salon ili studio uopste prima termine.",
+      href: "/admin/radno-vreme",
+      done: hasOpenWorkingHours,
+    },
+    {
+      key: "worker_schedule",
+      label: "Raspored radnika",
+      description: "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
+      href: "/admin/raspored",
+      done: hasWorkerSchedule,
+    },
+  ];
+  const completedSetupSteps = setupSteps.filter((step) => step.done).length;
+  const bookingSetupReady = completedSetupSteps === setupSteps.length;
 
   let bookingsQuery = supabase
     .from("bookings")
@@ -502,6 +598,75 @@ export default async function AdminBookingsPage({
           })}
           </div>
         </nav>
+
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                Status online zakazivanja
+              </p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                {bookingSetupReady
+                  ? "Sistem je spreman da prima online termine"
+                  : "Proveri sta jos nedostaje za online zakazivanje"}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Ovaj blok ostaje koristan i kasnije: brzo pokazuje da li javna
+                strana trenutno ima sve sto joj treba da prikaze slobodne
+                termine bez praznih koraka i zabune za klijenta.
+              </p>
+            </div>
+            <div className="min-w-[220px] rounded-2xl border border-primary/15 bg-primary/6 p-4">
+              <p className="text-sm font-semibold text-primary">
+                Spremnost: {completedSetupSteps}/{setupSteps.length}
+              </p>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-primary/10">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: setupProgressWidth(completedSetupSteps, setupSteps.length) }}
+                />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {bookingSetupReady
+                  ? "Klijenti mogu da zakazuju online, a admin moze i rucno da doda termin."
+                  : "Otvorite stavke ispod i dopunite ono sto jos nedostaje."}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {setupSteps.map((step, index) => (
+              <Link
+                key={step.key}
+                href={step.href}
+                className="rounded-xl border border-border/80 bg-background/95 p-4 transition hover:border-primary/30 hover:bg-background"
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={
+                      step.done
+                        ? "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                        : "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground"
+                    }
+                  >
+                    {step.done ? "OK" : index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-foreground">{step.label}</p>
+                      <span className="text-xs text-muted-foreground">
+                        {step.done ? "U redu" : "Nedostaje"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {step.description}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
 
         <div className="grid grid-cols-2 gap-2">
           <Link

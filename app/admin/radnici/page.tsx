@@ -147,7 +147,8 @@ export default async function WorkersPage({ searchParams }: WorkersPageProps) {
             <div className="p-8 text-center">
               <p className="font-medium text-foreground">Nema radnika.</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Dodaj prvog radnika da bi kasnije mogao da prima termine.
+                Dodaj prvog radnika, pa mu zatim povezi usluge i raspored da bi
+                online zakazivanje proradilo kako treba.
               </p>
             </div>
           )}

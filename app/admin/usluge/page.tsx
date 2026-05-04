@@ -79,7 +79,7 @@ export default async function ServicesPage() {
             <div className="p-8 text-center">
               <p className="font-medium text-foreground">Nema usluga.</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Dodaj prvu uslugu da bi mogla da se zakazuje.
+                Dodaj prvu uslugu, pa je zatim povezi sa radnicima koji je rade.
               </p>
             </div>
           )}
