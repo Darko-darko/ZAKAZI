@@ -350,7 +350,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
               Sadržaj
             </div>
             <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-              Osnovni tekst i kontakt podaci za javni mini sajt.
+              Osnovni tekst i kontakt podaci za javnu stranicu za zakazivanje.
             </p>
           </div>
 
@@ -476,7 +476,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
                 htmlFor="font_choice"
                 className="text-sm font-medium text-foreground"
               >
-                Font celog mini sajta
+                Font cele stranice
               </label>
               <select
                 id="font_choice"
@@ -661,7 +661,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
             disabled={pending}
             className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-5 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending ? "Cuvanje..." : "Sacuvaj mini sajt"}
+            {pending ? "Cuvanje..." : "Sacuvaj stranicu"}
           </button>
           {state.message ? (
             <p
@@ -1056,7 +1056,7 @@ function MiniSitePreview({
                 <span>zakazi.pro/{slug}</span>
               </div>
               <h3 className="mt-4 break-words text-[clamp(1.9rem,11vw,2.35rem)] font-bold leading-[0.98] tracking-tight">
-                {draft.name || "Naziv mini sajta"}
+                {draft.name || "Naziv stranice"}
               </h3>
               {heroText ? (
                 <p className="mt-4 break-words text-sm leading-6 text-white/88">

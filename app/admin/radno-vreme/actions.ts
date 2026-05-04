@@ -121,7 +121,7 @@ export async function createNonWorkingDayAction(
 
   return {
     status: "success" as const,
-    message: "Neradni dan je sacuvan i odmah je vidljiv na mini sajtu.",
+    message: "Neradni dan je sacuvan i odmah je vidljiv na stranici za zakazivanje.",
   };
 }
 

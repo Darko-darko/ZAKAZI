@@ -28,7 +28,7 @@ export function ShareSiteButton({
         try {
           await navigator.share({
             title: providerName,
-            text: `Pogledaj mini sajt za ${providerName}`,
+            text: "Pogledaj slobodne termine",
             url,
           });
           setMessage("Link je spreman za deljenje.");

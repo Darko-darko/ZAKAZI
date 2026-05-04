@@ -441,7 +441,7 @@ export default async function SuperAdminPage({
                             target="_blank"
                             className="btn-secondary mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
                           >
-                            Otvori mini sajt
+                            Otvori stranicu
                           </Link>
 
                           <Link

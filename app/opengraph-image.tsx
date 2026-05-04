@@ -120,12 +120,12 @@ export default function OpenGraphImage() {
                   lineHeight: 1.3,
                 }}
               >
-                Mini sajt i booking tok za salone, studije i ordinacije.
+                Stranica za zakazivanje i booking tok za salone, studije i ordinacije.
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 16, color: "#0f766e" }}>
-              {["Mini sajt", "Booking 24/7", "Bez poziva"].map((item) => (
+              {["Stranica", "Booking 24/7", "Bez poziva"].map((item) => (
                 <div
                   key={item}
                   style={{

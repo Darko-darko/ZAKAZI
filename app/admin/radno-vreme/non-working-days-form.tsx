@@ -59,7 +59,7 @@ export function NonWorkingDaysForm({
           Zatvori salon za odredjene datume
         </h2>
         <p className="text-sm text-muted-foreground">
-          Ovo blokira online termine za ceo salon i prikazuje informaciju na mini sajtu.
+          Ovo blokira online termine za ceo salon i prikazuje informaciju na stranici za zakazivanje.
         </p>
       </div>
 

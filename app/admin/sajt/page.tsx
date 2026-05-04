@@ -4,7 +4,7 @@ import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
 
 export const metadata = {
-  title: "Mini sajt | zakazi.pro",
+  title: "Vasa stranica | zakazi.pro",
 };
 
 export default async function AdminSitePage() {
@@ -49,7 +49,7 @@ export default async function AdminSitePage() {
     : null;
 
   if (!provider) {
-    throw new Error("Mini sajt nije pronadjen.");
+    throw new Error("Stranica nije pronadjena.");
   }
 
   const [{ data: services }, { data: workers }] = await Promise.all([
@@ -79,7 +79,7 @@ export default async function AdminSitePage() {
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand-soft px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand">
                 <span>Admin</span>
                 <span className="h-1 w-1 rounded-full bg-brand/40" />
-                <span>Mini sajt editor</span>
+                <span>Editor stranice</span>
               </div>
               <div className="space-y-2">
                 <Link
@@ -89,7 +89,7 @@ export default async function AdminSitePage() {
                   Admin
                 </Link>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                  Mini sajt
+                  Vasa stranica
                 </h1>
                 <p className="max-w-xl text-muted-foreground">
                   Uredi javnu stranicu za zakazi.pro/{provider.slug}
@@ -102,7 +102,7 @@ export default async function AdminSitePage() {
                 Javni link
               </p>
               <p className="mt-2 text-sm text-foreground">
-                Podeli mini sajt sa klijentima ili ga proveri uživo.
+                Podeli svoju stranicu sa klijentima ili je proveri uzivo.
               </p>
               <div className="mt-4">
                 <ShareSiteButton
@@ -113,7 +113,6 @@ export default async function AdminSitePage() {
               </div>
             </div>
           </div>
-
         </header>
 
         <div className="grid gap-8">

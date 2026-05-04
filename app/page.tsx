@@ -10,7 +10,7 @@ const benefits = [
     text: "Usluge, radnici, smene i termini su na jednom mestu, spremni za salon, studio ili ordinaciju.",
   },
   {
-    title: "Mini sajt koji prodaje",
+    title: "Stranica koja prodaje",
     text: "Svaki biznis dobija javnu stranicu sa opisom, kontaktom i jasnim putem do zakazivanja.",
   },
 ];
@@ -32,7 +32,7 @@ const plans = [
     name: "Trial",
     price: "0 RSD / 30 dana",
     note: "Za probu, podešavanje naloga i prve online termine",
-    features: ["Mini sajt", "Online booking", "Osnovni raspored"],
+    features: ["Stranica za zakazivanje", "Online booking", "Osnovni raspored"],
   },
   {
     name: "Basic",
@@ -84,9 +84,9 @@ export default function HomePage() {
               Online zakazivanje za salone, studije i ordinacije
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
-              zakazi.pro daje tvom biznisu profesionalan mini sajt i booking
-              tok. Klijenti biraju uslugu, radnika i slobodan termin bez
-              poziva, čekanja i dopisivanja.
+              zakazi.pro daje tvom biznisu profesionalnu stranicu za
+              zakazivanje i booking tok. Klijenti biraju uslugu, radnika i
+              slobodan termin bez poziva, čekanja i dopisivanja.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -122,7 +122,7 @@ export default function HomePage() {
             <div className="rounded-md border border-border bg-background p-4">
               <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Mini sajt</p>
+                  <p className="text-sm text-muted-foreground">Stranica za zakazivanje</p>
                   <h2 className="mt-1 text-2xl font-semibold">Studio Aurora</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Kozmetički tretmani i masaže, Novi Sad
@@ -211,15 +211,15 @@ export default function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-14 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div className="flex flex-col justify-center">
             <p className="text-sm font-semibold uppercase text-brand">
-              Primer mini sajta
+              Primer stranice za zakazivanje
             </p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
               Stranica koju možeš odmah da pošalješ klijentima
             </h2>
             <p className="mt-4 leading-7 text-muted-foreground">
-              Mini sajt prikazuje šta radiš, gde se nalaziš i koji termini su
-              slobodni. Klijent ne mora da instalira aplikaciju niti da pravi
-              nalog.
+              Stranica za zakazivanje prikazuje šta radiš, gde se nalaziš i
+              koji termini su slobodni. Klijent ne mora da instalira aplikaciju
+              niti da pravi nalog.
             </p>
           </div>
 

@@ -65,7 +65,7 @@ export async function updateSiteBrandingAction(
   const name = readString(formData, "name");
 
   if (!name) {
-    return { ok: false, message: "Naziv mini sajta je obavezan." };
+    return { ok: false, message: "Naziv stranice je obavezan." };
   }
 
   const update = {
@@ -118,7 +118,7 @@ export async function updateSiteBrandingAction(
   revalidatePath("/admin/sajt");
   revalidatePath(`/${provider.slug}`);
 
-  return { ok: true, message: "Mini sajt je sacuvan." };
+  return { ok: true, message: "Stranica je sacuvana." };
 }
 
 export async function updateSiteAssetAction(

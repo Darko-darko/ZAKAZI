@@ -9,7 +9,7 @@
 
 SaaS platforma za **online zakazivanje termina** za salone, studije i ordinacije u Srbiji (frizerski/kozmetički saloni, stomatološke ordinacije, masažni studiji, sve što prima klijente po terminima). Originalno je bila usko skrojena za frizerske salone — scope je proširen 2026-04-24 da pokrije sve uslužne delatnosti koje rade po terminima.
 
-Svaki biznis dobija **mini sajt sa booking funkcijom**:
+Svaki biznis dobija **stranicu za zakazivanje sa booking funkcijom**:
 
 - `zakazi.pro/[slug]` (default)
 - `salonmila.rs` (custom domena — Pro plan)
@@ -29,7 +29,7 @@ Svaki biznis dobija **mini sajt sa booking funkcijom**:
 | PDF | **@react-pdf/renderer** | Server-side fakture |
 | Language | **TypeScript** | Strict, obavezno |
 | Styling | **Tailwind CSS v4** | `@theme` u CSS-u, ne `tailwind.config.js` |
-| UI Library | **shadcn/ui** | Samo admin/agent/superadmin paneli, ne mini sajt |
+| UI Library | **shadcn/ui** | Samo admin/agent/superadmin paneli, ne stranica za zakazivanje |
 
 ---
 
@@ -392,7 +392,7 @@ INSERT: with check provider_id = (SELECT id FROM providers WHERE user_id = auth.
 
 ```
 SELECT (own): user_id = auth.uid()
-SELECT (public, by slug): bilo ko može da pročita osnovne kolone (name, slug, description, brending, etc.) — ZA mini sajt
+SELECT (public, by slug): bilo ko može da pročita osnovne kolone (name, slug, description, brending, etc.) — ZA stranicu za zakazivanje
 UPDATE: user_id = auth.uid()
 DELETE: zabranjeno za salon admina; samo super admin via service_role
 ```
@@ -420,7 +420,7 @@ INSERT (claim payment): public via payment_claim_token (no auth) — public funk
 UPDATE/DELETE: samo super admin
 ```
 
-### Public tables (za mini sajt — bez auth)
+### Public tables (za stranicu za zakazivanje — bez auth)
 
 `provider_gallery`, `services` (read-only), `bookings` (insert-only za pending) — accessibility preko RPC funkcija ili public RLS sa whitelist kolonama.
 
@@ -432,7 +432,7 @@ Super Admin **ne koristi RLS** — koristi `service_role` key sa servera (`lib/s
 
 ## 8. Routes / Screens
 
-### Javni mini sajt (`/[slug]/`)
+### Javna stranica za zakazivanje (`/[slug]/`)
 
 | Ruta | Opis |
 |------|------|
@@ -717,7 +717,7 @@ SSL automatski via Vercel
 
 ---
 
-## 11. Mini sajt — Brending sistem
+## 11. Stranica za zakazivanje — Brending sistem
 
 ```css
 --primary-color    /* boja dugmadi, akcenata */
@@ -728,7 +728,7 @@ SSL automatski via Vercel
 Primenjuje se isključivo na `/[slug]/*` rutama (root layout za taj segment).
 Admin vidi **live preview** u `/admin/sajt` dok menja vrednosti.
 
-> **Mini sajt nikad nije light/dark toggle.** On je "sajt u bojama biznisa". Ako biznis hoće tamnu temu, bira tamne boje u brending panelu.
+> **Stranica za zakazivanje nikad nije light/dark toggle.** Ona je "sajt u bojama biznisa". Ako biznis hoce tamnu temu, bira tamne boje u brending panelu.
 
 ---
 
@@ -753,7 +753,7 @@ Storage: `Supabase Storage → invoices/[number].pdf`
 ```
 zakazivanje/
 ├── app/
-│   ├── [slug]/                     # Javni mini sajt
+│   ├── [slug]/                     # Javna stranica za zakazivanje
 │   │   ├── page.tsx
 │   │   ├── book/
 │   │   │   ├── page.tsx
@@ -864,7 +864,7 @@ $$);
 | 2 | **Auth + Onboarding** | ⬜ Pending | Register (direktno + ref), Login (jedan endpoint, role redirect), onboarding wizard |
 | 3 | **Admin core** | ⬜ Pending | Radnici/Usluge/Smene CRUD, raspored + rotacije + override, blokade |
 | 4 | **Booking engine** | ⬜ Pending | `lib/slots.ts`, booking wizard (4 koraka), race condition, email notifikacije |
-| 5 | **Mini sajt** | ⬜ Pending | Landing `/[slug]`, brending sistem, live preview, galerija |
+| 5 | **Stranica za zakazivanje** | ⬜ Pending | Landing `/[slug]`, brending sistem, live preview, galerija |
 | 6 | **Admin dashboard** | ⬜ Pending | Today view, lista termina + filteri, statusi |
 | 7 | **Billing** | ⬜ Pending | PDF, "Poslao sam uplatu", emailovi, cron, plan status |
 | 8 | **Agent panel** | ⬜ Pending | Dashboard, lista, brza registracija, referral, zarada |
@@ -915,7 +915,7 @@ Vidi §3 za detalje. Faza 1 nije gotova — fali šema, RLS, pg_cron.
 
 ### shadcn/ui
 - Samo `/admin/*`, `/agent/*`, `/superadmin/*`, `/login`, `/register`
-- Mini sajt (`/[slug]/*`) ima **custom dizajn** — shadcn ne pasuje brending sistemu
+- Stranica za zakazivanje (`/[slug]/*`) ima **custom dizajn** — shadcn ne pasuje brending sistemu
 
 ### Server Actions vs API routes
 - **Default: Server Actions** za mutacije (forme, CRUD)

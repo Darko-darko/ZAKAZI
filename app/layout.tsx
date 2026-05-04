@@ -9,12 +9,12 @@ export const metadata: Metadata = {
     template: "%s | zakazi.pro",
   },
   description:
-    "Mini sajt sa booking funkcijom za salone, studije i ordinacije. Klijenti zakazuju termin bez poziva, 24 sata dnevno.",
+    "Stranica za zakazivanje za salone, studije i ordinacije. Klijenti zakazuju termin bez poziva, 24 sata dnevno.",
   keywords: [
     "online zakazivanje",
     "zakazivanje termina",
     "booking sistem",
-    "mini sajt",
+    "stranica za zakazivanje",
     "saloni",
     "studiji",
     "ordinacije",
@@ -32,13 +32,13 @@ export const metadata: Metadata = {
     siteName: "zakazi.pro",
     title: "zakazi.pro - online zakazivanje termina",
     description:
-      "Profesionalan mini sajt i booking tok za usluzne biznise. Klijenti biraju uslugu, radnika i slobodan termin bez poziva.",
+      "Profesionalna stranica za zakazivanje i booking tok za usluzne biznise. Klijenti biraju uslugu, radnika i slobodan termin bez poziva.",
   },
   twitter: {
     card: "summary_large_image",
     title: "zakazi.pro - online zakazivanje termina",
     description:
-      "Mini sajt i online booking za salone, studije i ordinacije.",
+      "Stranica za zakazivanje i online booking za salone, studije i ordinacije.",
   },
   robots: {
     index: true,
