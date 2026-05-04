@@ -253,6 +253,30 @@ export type Database = {
           },
         ]
       }
+      auth_rate_limit_events: {
+        Row: {
+          action: string
+          created_at: string
+          email: string | null
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
       invoice_counters: {
         Row: {
           last_number: number

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getReferralAgent } from "@/lib/auth/referrals";
+import { enforceAuthRateLimit } from "@/lib/auth/rate-limit";
 import { getPostLoginRedirect } from "@/lib/auth/roles";
 import { createProviderSlug } from "@/lib/slug";
 import { createClient } from "@/lib/supabase/server";
@@ -120,6 +121,11 @@ export async function loginAction(
     return error("Unesi email i lozinku.", { email, password: "" });
   }
 
+  const loginLimit = await enforceAuthRateLimit({ action: "login", email });
+  if (!loginLimit.allowed) {
+    return error(loginLimit.message, { email, password: "" });
+  }
+
   const supabase = await createClient();
   const { data, error: signInError } = await supabase.auth.signInWithPassword({
     email,
@@ -152,6 +158,14 @@ export async function forgotPasswordAction(
 
   if (!email.includes("@") || email.length < 5) {
     return error("Unesi ispravan email.", { email });
+  }
+
+  const forgotPasswordLimit = await enforceAuthRateLimit({
+    action: "forgot_password",
+    email,
+  });
+  if (!forgotPasswordLimit.allowed) {
+    return error(forgotPasswordLimit.message, { email });
   }
 
   const supabase = await createClient();
@@ -188,6 +202,19 @@ export async function resendConfirmationAction(
 
   if (!email.includes("@") || email.length < 5) {
     return error("Unesi ispravan email.", { email });
+  }
+
+  const resendLimit = await enforceAuthRateLimit({
+    action: "resend_confirmation",
+    email,
+  });
+  if (!resendLimit.allowed) {
+    return {
+      status: "error",
+      message: resendLimit.message,
+      fields: { email },
+      canResendConfirmation: true,
+    };
   }
 
   const supabase = await createClient();
@@ -389,6 +416,11 @@ export async function registerAction(
 
   if (password.length < 8) {
     return error("Lozinka mora imati najmanje 8 karaktera.", fields);
+  }
+
+  const registerLimit = await enforceAuthRateLimit({ action: "register", email });
+  if (!registerLimit.allowed) {
+    return error(registerLimit.message, fields);
   }
 
   const supabase = await createClient();
