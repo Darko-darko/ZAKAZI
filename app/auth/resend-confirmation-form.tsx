@@ -18,15 +18,15 @@ type ResendConfirmationFormProps = {
 export function ResendConfirmationForm({
   email,
 }: ResendConfirmationFormProps) {
+  void email;
+
   const [state, formAction, pending] = useActionState(
     resendConfirmationAction,
     initialState,
   );
 
   return (
-    <form action={formAction} className="space-y-3">
-      <input type="hidden" name="email" value={email} />
-
+    <div className="space-y-3">
       {state.message ? (
         <p
           className={
@@ -41,11 +41,13 @@ export function ResendConfirmationForm({
 
       <button
         type="submit"
+        formAction={formAction}
+        formNoValidate
         disabled={pending}
         className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Slanje..." : "Pošalji ponovo potvrdu emaila"}
       </button>
-    </form>
+    </div>
   );
 }
