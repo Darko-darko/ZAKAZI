@@ -56,13 +56,15 @@ type BookingEmailType =
   | "confirmation_client"
   | "confirmation_admin"
   | "cancellation_client"
-  | "cancellation_admin";
+  | "cancellation_admin"
+  | "reminder_client";
 
 type BookingEmailTrigger =
   | "public_booking"
   | "admin_manual"
   | "resend"
-  | "client_cancellation";
+  | "client_cancellation"
+  | "reminder_cron";
 
 type BookingEmailAttempt = {
   status: "sent" | "failed" | "skipped";
@@ -82,6 +84,13 @@ type SendBookingEmailsResult = {
   client: BookingEmailAttempt | null;
   admin: BookingEmailAttempt | null;
   skipped: string | null;
+};
+
+type SendBookingRemindersResult = {
+  checked: number;
+  sent: number;
+  skipped: number;
+  failed: number;
 };
 
 type ClientCancellationResult =
@@ -197,6 +206,10 @@ function formatPublicBaseUrl(context: Pick<BookingEmailContext, "providerCustomD
 
 function formatCancellationUrl(context: Pick<BookingEmailContext, "providerCustomDomain" | "providerSlug" | "cancelToken">) {
   return `${formatPublicBaseUrl(context)}/otkazivanje/${context.cancelToken}`;
+}
+
+function buildClientReminderSubject(context: BookingEmailContext) {
+  return `Podsetnik za termin danas u ${formatTime(context.startsAt)} Â· ${context.providerName}`;
 }
 
 function buildClientBookingSubject(context: BookingEmailContext) {
@@ -537,6 +550,83 @@ function buildClientCancellationText(context: BookingEmailContext) {
   ].join("\n");
 }
 
+function buildClientReminderEmail(context: BookingEmailContext) {
+  const cancellationBlock = canClientCancelBooking(context)
+    ? `
+      <div style="margin-top: 20px; padding: 16px 18px; border-radius: 16px; background: #f8fafc; border: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 8px; font-weight: 700; color: #0f172a;">Ako treba da otkazes termin</p>
+        <p style="margin: 0 0 14px; color: #475569;">
+          Otkazivanje je moguce najkasnije ${context.cancelMinHours} ${
+            context.cancelMinHours === 1 ? "sat" : "sata"
+          } pre pocetka.
+        </p>
+        ${renderButton("Otkazi termin", formatCancellationUrl(context))}
+      </div>
+    `
+    : "";
+
+  return `
+    <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
+      <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #0f766e;">
+        Podsetnik za termin
+      </p>
+      <h1 style="margin: 0 0 16px; font-size: 24px; line-height: 1.25;">Tvoj termin pocinje za oko 2 sata</h1>
+      <p style="margin: 0 0 14px;">Zdravo ${escapeHtml(context.clientName)},</p>
+      <p style="margin: 0 0 18px; color: #334155;">
+        Podsecamo te na termin kod salona <strong>${escapeHtml(context.providerName)}</strong>.
+      </p>
+      <div style="border-radius: 18px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div style="padding: 16px 18px; background: #0f766e; color: #f8fafc;">
+          <p style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">
+            Termin
+          </p>
+          <p style="margin: 8px 0 0; font-size: 20px; font-weight: 700;">${escapeHtml(formatDateTime(context.startsAt))}</p>
+        </div>
+        <div style="padding: 16px 18px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            ${renderInfoRow("Usluga", context.serviceName)}
+            ${renderInfoRow("Radnik", context.workerName)}
+            ${renderInfoRow("Trajanje", formatDuration(context.serviceDurationMinutes))}
+            ${renderInfoRow("Vreme", `${formatTime(context.startsAt)} - ${formatTime(context.endsAt)}`)}
+            ${renderInfoRow("Cena", formatPrice(context.servicePrice))}
+          </table>
+        </div>
+      </div>
+      ${cancellationBlock}
+      <p style="margin-top: 24px; color: #64748b; font-size: 13px;">
+        Ovaj email je transakcioni podsetnik termina sa platforme zakazi.pro.
+      </p>
+    </div>
+  `;
+}
+
+function buildClientReminderText(context: BookingEmailContext) {
+  const lines = [
+    "Podsetnik za termin",
+    "",
+    `Zdravo ${context.clientName},`,
+    `Tvoj termin kod salona ${context.providerName} pocinje za oko 2 sata.`,
+    "",
+    `Termin: ${formatDateTime(context.startsAt)}`,
+    `Usluga: ${context.serviceName}`,
+    `Radnik: ${context.workerName}`,
+    `Trajanje: ${formatDuration(context.serviceDurationMinutes)}`,
+    `Vreme: ${formatTime(context.startsAt)} - ${formatTime(context.endsAt)}`,
+    `Cena: ${formatPrice(context.servicePrice)}`,
+  ];
+
+  if (canClientCancelBooking(context)) {
+    lines.push("");
+    lines.push("Ako treba da otkazes termin:");
+    lines.push(formatCancellationUrl(context));
+  }
+
+  lines.push("");
+  lines.push("Ovaj email je transakcioni podsetnik termina sa platforme zakazi.pro.");
+
+  return lines.join("\n");
+}
+
 function buildAdminCancellationEmail(context: BookingEmailContext) {
   return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px 16px; background: #f8fafc;">
@@ -807,6 +897,111 @@ export async function sendBookingEmails(
   }
 
   return { client, admin, skipped: null };
+}
+
+async function listDueReminderContexts() {
+  const admin = createAdminClient();
+  const windowStart = new Date(Date.now() + 115 * 60 * 1000).toISOString();
+  const windowEnd = new Date(Date.now() + 125 * 60 * 1000).toISOString();
+
+  const { data, error } = await admin
+    .from("bookings")
+    .select(
+      "id, status, starts_at, ends_at, client_name, client_phone, client_email, notes, cancel_token, services(name, duration_minutes, price), workers(name), providers(id, name, slug, custom_domain, billing_email, cancel_min_hours)",
+    )
+    .eq("status", "confirmed")
+    .not("client_email", "is", null)
+    .gte("starts_at", windowStart)
+    .lt("starts_at", windowEnd);
+
+  if (error) {
+    throw new Error(`Ucitavanje booking remindera nije uspelo: ${error.message}`);
+  }
+
+  return (data ?? []).map((record) =>
+    mapRecordToContext(record as BookingNotificationRecord),
+  );
+}
+
+async function wasReminderAlreadySent(bookingId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("booking_email_logs")
+    .select("id")
+    .eq("booking_id", bookingId)
+    .eq("email_type", "reminder_client")
+    .eq("trigger_source", "reminder_cron")
+    .eq("status", "sent")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Provera prethodno poslatog reminder emaila nije uspela: ${error.message}`,
+    );
+  }
+
+  return Boolean(data);
+}
+
+export async function sendDueBookingReminders(): Promise<SendBookingRemindersResult> {
+  const contexts = await listDueReminderContexts();
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const context of contexts) {
+    if (await wasReminderAlreadySent(context.id)) {
+      skipped += 1;
+      continue;
+    }
+
+    if (!bookingEmailsEnabled()) {
+      await skipBookingEmail({
+        context,
+        emailType: "reminder_client",
+        triggerSource: "reminder_cron",
+        recipientEmail: context.clientEmail,
+        subject: buildClientReminderSubject(context),
+        reason: "BOOKING_EMAILS_ENABLED=false",
+      });
+      skipped += 1;
+      continue;
+    }
+
+    const attempt = await sendAndLogBookingEmail({
+      context,
+      emailType: "reminder_client",
+      triggerSource: "reminder_cron",
+      recipientEmail: context.clientEmail,
+      recipientName: context.clientName,
+      subject: buildClientReminderSubject(context),
+      htmlContent: buildClientReminderEmail(context),
+      textContent: buildClientReminderText(context),
+      tags: ["booking-reminder", context.providerSlug],
+      replyTo: context.providerBillingEmail
+        ? {
+            email: context.providerBillingEmail,
+            name: context.providerName,
+          }
+        : undefined,
+    });
+
+    if (attempt.status === "sent") {
+      sent += 1;
+    } else if (attempt.status === "skipped") {
+      skipped += 1;
+    } else {
+      failed += 1;
+    }
+  }
+
+  return {
+    checked: contexts.length,
+    sent,
+    skipped,
+    failed,
+  };
 }
 
 export async function cancelBookingByToken(
