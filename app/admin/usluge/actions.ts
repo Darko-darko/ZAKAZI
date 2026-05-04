@@ -36,10 +36,10 @@ function readNullableMoney(formData: FormData) {
 }
 
 function readSortOrder(formData: FormData) {
-  const value = Number(readString(formData, "sort_order") || 0);
+  const value = Number(readString(formData, "sort_order") || 1);
 
-  if (!Number.isFinite(value)) {
-    return 0;
+  if (!Number.isFinite(value) || value < 1) {
+    return 1;
   }
 
   return Math.round(value);

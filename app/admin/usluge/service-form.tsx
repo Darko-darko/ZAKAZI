@@ -15,6 +15,9 @@ export function ServiceForm({
   service,
   submitLabel,
 }: ServiceFormProps) {
+  const currentSortOrder = Math.max(service?.sort_order ?? 1, 1);
+  const sortOrderOptions = Array.from({ length: 20 }, (_, index) => index + 1);
+
   return (
     <form action={action} className="space-y-5">
       <div className="space-y-2">
@@ -72,14 +75,18 @@ export function ServiceForm({
           >
             Redosled
           </label>
-          <input
+          <select
             id="sort_order"
             name="sort_order"
-            type="number"
-            step={1}
-            defaultValue={service?.sort_order ?? 0}
+            defaultValue={currentSortOrder}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-          />
+          >
+            {sortOrderOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
