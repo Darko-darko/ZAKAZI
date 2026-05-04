@@ -58,8 +58,53 @@ function getLoginErrorMessage(message: string | undefined) {
   return "Prijava nije uspela. Proveri email, lozinku i da li je nalog potvrdjen.";
 }
 
-function getAuthOrigin() {
-  return headers().then((headerStore) => headerStore.get("origin") ?? undefined);
+const PRODUCTION_APP_URL = "https://zakazi.pro";
+
+function normalizeAppUrl(value: string | null | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(normalized);
+
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return undefined;
+    }
+
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+async function getAppUrl() {
+  const envUrl = normalizeAppUrl(
+    process.env.APP_URL ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      process.env.SITE_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL,
+  );
+
+  if (envUrl) {
+    return envUrl;
+  }
+
+  const headerStore = await headers();
+  const forwardedProto = headerStore.get("x-forwarded-proto");
+  const forwardedHost = headerStore.get("x-forwarded-host");
+  const forwardedUrl =
+    forwardedProto && forwardedHost
+      ? normalizeAppUrl(`${forwardedProto}://${forwardedHost}`)
+      : undefined;
+
+  return normalizeAppUrl(headerStore.get("origin")) ?? forwardedUrl ?? PRODUCTION_APP_URL;
 }
 
 export async function loginAction(
@@ -110,12 +155,12 @@ export async function forgotPasswordAction(
   }
 
   const supabase = await createClient();
-  const origin = await getAuthOrigin();
+  const appUrl = await getAppUrl();
 
   const { error: resetError } = await supabase.auth.resetPasswordForEmail(
     email,
     {
-      redirectTo: origin ? `${origin}/reset-password` : undefined,
+      redirectTo: `${appUrl}/reset-password`,
     },
   );
 
@@ -146,13 +191,13 @@ export async function resendConfirmationAction(
   }
 
   const supabase = await createClient();
-  const origin = await getAuthOrigin();
+  const appUrl = await getAppUrl();
 
   const { error: resendError } = await supabase.auth.resend({
     type: "signup",
     email,
     options: {
-      emailRedirectTo: origin ? `${origin}/register/onboarding` : undefined,
+      emailRedirectTo: `${appUrl}/register/onboarding`,
     },
   });
 
@@ -347,14 +392,14 @@ export async function registerAction(
   }
 
   const supabase = await createClient();
-  const origin = await getAuthOrigin();
+  const appUrl = await getAppUrl();
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { provider_name: providerName },
-      emailRedirectTo: origin ? `${origin}/register/onboarding` : undefined,
+      emailRedirectTo: `${appUrl}/register/onboarding`,
     },
   });
 
