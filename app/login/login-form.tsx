@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { loginAction, type AuthActionState } from "@/app/auth/actions";
 import { PasswordInput } from "@/app/auth/password-input";
+import { ResendConfirmationForm } from "@/app/auth/resend-confirmation-form";
 
 const initialState: AuthActionState = {
   status: "idle",
@@ -55,6 +56,10 @@ export function LoginForm({ notice }: LoginFormProps) {
         <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {state.message}
         </p>
+      ) : null}
+
+      {state.canResendConfirmation && state.fields?.email ? (
+        <ResendConfirmationForm email={state.fields.email} />
       ) : null}
 
       <button

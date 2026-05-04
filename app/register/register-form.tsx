@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { registerAction, type AuthActionState } from "@/app/auth/actions";
 import { PasswordInput } from "@/app/auth/password-input";
+import { ResendConfirmationForm } from "@/app/auth/resend-confirmation-form";
 import { createProviderSlug } from "@/lib/slug";
 
 const initialState: AuthActionState = {
@@ -130,6 +131,10 @@ export function RegisterForm({ refCode = "" }: RegisterFormProps) {
         >
           {state.message}
         </p>
+      ) : null}
+
+      {state.canResendConfirmation && field("email") ? (
+        <ResendConfirmationForm email={field("email")} />
       ) : null}
 
       <button

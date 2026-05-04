@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
 import { OnboardingForm } from "./onboarding-form";
+import { OnboardingAccess } from "./onboarding-access";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -7,7 +7,12 @@ export const metadata = {
 };
 
 type OnboardingPageProps = {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{
+    code?: string;
+    error?: string;
+    error_description?: string;
+    ref?: string;
+  }>;
 };
 
 export default async function OnboardingPage({
@@ -15,9 +20,29 @@ export default async function OnboardingPage({
 }: OnboardingPageProps) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
+  const params = await searchParams;
 
   if (!userData.user) {
-    redirect("/login");
+    return (
+      <main className="flex flex-1 items-center justify-center px-6 py-16">
+        <section className="w-full max-w-xl space-y-8">
+          <div className="space-y-3 text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Potvrda naloga
+            </h1>
+            <p className="text-muted-foreground">
+              Zavrsavamo potvrdu email adrese i pripremamo onboarding.
+            </p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-6 text-card-foreground">
+            <OnboardingAccess
+              code={params.code}
+              linkError={params.error || params.error_description}
+            />
+          </div>
+        </section>
+      </main>
+    );
   }
 
   const { data: provider } = await supabase
@@ -26,7 +51,7 @@ export default async function OnboardingPage({
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
-  const { ref } = await searchParams;
+  const { ref } = params;
   const refCode = typeof ref === "string" ? ref.trim().toUpperCase() : "";
 
   return (

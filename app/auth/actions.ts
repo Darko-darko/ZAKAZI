@@ -11,6 +11,7 @@ export type AuthActionState = {
   status: "idle" | "error" | "success";
   message: string;
   fields?: Record<string, string>;
+  canResendConfirmation?: boolean;
 };
 
 const emptyState: AuthActionState = {
@@ -81,10 +82,16 @@ export async function loginAction(
   });
 
   if (signInError || !data.user) {
-    return error(getLoginErrorMessage(signInError?.message), {
-      email,
-      password: "",
-    });
+    const message = getLoginErrorMessage(signInError?.message);
+    return {
+      status: "error",
+      message,
+      fields: {
+        email,
+        password: "",
+      },
+      canResendConfirmation: message.toLowerCase().includes("potvrd"),
+    };
   }
 
   redirect(await getPostLoginRedirect(supabase, data.user));
@@ -123,6 +130,48 @@ export async function forgotPasswordAction(
     message:
       "Ako nalog postoji, poslali smo email sa linkom za postavljanje nove lozinke.",
     fields: { email },
+  };
+}
+
+export async function resendConfirmationAction(
+  _state: AuthActionState = emptyState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  void _state;
+
+  const email = readString(formData, "email").toLowerCase();
+
+  if (!email.includes("@") || email.length < 5) {
+    return error("Unesi ispravan email.", { email });
+  }
+
+  const supabase = await createClient();
+  const origin = await getAuthOrigin();
+
+  const { error: resendError } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: origin ? `${origin}/register/onboarding` : undefined,
+    },
+  });
+
+  if (resendError) {
+    return {
+      status: "error",
+      message:
+        "Potvrda nije poslata. Sačekaj malo i probaj ponovo, ili proveri spam/promotions folder.",
+      fields: { email },
+      canResendConfirmation: true,
+    };
+  }
+
+  return {
+    status: "success",
+    message:
+      "Poslali smo novu potvrdu emaila. Proveri inbox, spam i promotions folder.",
+    fields: { email },
+    canResendConfirmation: true,
   };
 }
 
@@ -324,6 +373,7 @@ export async function registerAction(
       message:
         "Nalog je kreiran. Potvrdi email adresu, pa se prijavi da zavrsis onboarding.",
       fields,
+      canResendConfirmation: true,
     };
   }
 
