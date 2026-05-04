@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ReferralLinkActions } from "@/app/_components/referral-link-actions";
 import { logoutAction } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 import { RegisterProviderForm } from "./register-form";
@@ -93,8 +94,7 @@ export default async function AgentPage() {
               {agent.name}
             </h1>
             <p className="text-muted-foreground">
-              Provizija po default-u: {agent.default_commission_percent}% · Ref
-              kod: {agent.ref_code}
+              Provizija po default-u: {agent.default_commission_percent}%
             </p>
           </div>
           <form action={logoutAction}>
@@ -124,6 +124,18 @@ export default async function AgentPage() {
             </p>
           </div>
         </div>
+
+        <section className="rounded-md border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-foreground">
+            Moj referral link
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pošalji ovaj link salonu da registracija automatski bude pripisana tebi.
+          </p>
+          <div className="mt-4 max-w-2xl">
+            <ReferralLinkActions refCode={agent.ref_code} />
+          </div>
+        </section>
 
         <section className="rounded-md border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-foreground">

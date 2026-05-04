@@ -1,5 +1,6 @@
 "use client";
 
+import { ReferralLinkActions } from "@/app/_components/referral-link-actions";
 import { useActionState, useState } from "react";
 import { createAgentAction, type CreateAgentState } from "./actions";
 
@@ -38,7 +39,7 @@ export function NewAgentForm() {
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             Email: <span className="font-medium text-foreground">{state.agentEmail}</span>
-            {" · "}Ref kod:{" "}
+            {" · "}Interni kod:{" "}
             <span className="font-mono font-semibold text-foreground">
               {state.agentRefCode}
             </span>
@@ -47,6 +48,14 @@ export function NewAgentForm() {
             Diktiraj agentu lozinku — vidiš je samo jednom. Sledeći put neka
             koristi &quot;Zaboravljena lozinka&quot;.
           </p>
+          {state.agentRefCode ? (
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-medium text-foreground">
+                Referral link za deljenje
+              </p>
+              <ReferralLinkActions refCode={state.agentRefCode} />
+            </div>
+          ) : null}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <code className="rounded-md border border-border bg-background px-3 py-2 font-mono text-base font-bold tracking-wider text-foreground">
               {state.generatedPassword}

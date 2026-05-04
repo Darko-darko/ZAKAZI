@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReferralLinkActions } from "@/app/_components/referral-link-actions";
 import { logoutAction } from "@/app/auth/actions";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
 import { NewAgentForm } from "./new-agent-form";
@@ -98,7 +99,7 @@ export default async function SuperAdminAgentsPage() {
                 <thead className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Agent</th>
-                    <th className="px-4 py-3 font-medium">Ref kod</th>
+                    <th className="px-4 py-3 font-medium">Referral link</th>
                     <th className="px-4 py-3 font-medium">Provizija %</th>
                     <th className="px-4 py-3 font-medium">Saloni</th>
                     <th className="px-4 py-3 font-medium">Isplaćeno</th>
@@ -125,9 +126,7 @@ export default async function SuperAdminAgentsPage() {
                           ) : null}
                         </td>
                         <td className="px-4 py-3">
-                          <code className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs font-semibold">
-                            {agent.ref_code}
-                          </code>
+                          <ReferralLinkActions refCode={agent.ref_code} compact />
                         </td>
                         <td className="px-4 py-3">
                           <form
