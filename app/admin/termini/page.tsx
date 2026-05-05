@@ -101,6 +101,16 @@ const STATUS_FILTERS = [
   ["", "Svi statusi"],
 ] as const;
 
+const WEEK_DAYS = [
+  [1, "ponedeljak"],
+  [2, "utorak"],
+  [3, "sredu"],
+  [4, "cetvrtak"],
+  [5, "petak"],
+  [6, "subotu"],
+  [0, "nedelju"],
+] as const;
+
 const ADMIN_LINKS = [
   ["/admin/termini", "Termini"],
   ["/admin/radnici", "Radnici"],
@@ -351,7 +361,7 @@ export default async function AdminBookingsPage({
       .eq("provider_id", provider.id),
     supabase
       .from("worker_schedule")
-      .select("id, worker_id, day_of_week, shift_id"),
+      .select("id, worker_id, day_of_week, shift_id, custom_start_time"),
     supabase
       .from("shifts")
       .select("id, name, start_time, end_time")
@@ -424,6 +434,26 @@ export default async function AdminBookingsPage({
     }
 
     return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+  });
+  const daysWithWorkers = new Set(
+    (workerSchedules ?? [])
+      .filter((row) => workerIds.has(row.worker_id) && (row.shift_id || row.custom_start_time))
+      .map((row) => row.day_of_week),
+  );
+  const openDaysWithoutWorkers = WEEK_DAYS.flatMap(([dayIndex, dayName]) => {
+    const day = workingHoursByDay.get(dayIndex);
+
+    if (
+      !day ||
+      day.is_closed ||
+      !day.opens_at ||
+      !day.closes_at ||
+      daysWithWorkers.has(dayIndex)
+    ) {
+      return [];
+    }
+
+    return [dayName];
   });
   const setupSteps: SetupStep[] = [
     {
@@ -511,6 +541,19 @@ export default async function AdminBookingsPage({
         invalidScheduleRows.length === 1
           ? "Jedna smena ili raspored je van otvorenog radnog vremena."
           : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+      href: "/admin/raspored",
+      severity: "warning",
+    });
+  }
+
+  if (openDaysWithoutWorkers.length > 0) {
+    alerts.push({
+      key: "open_days_without_workers",
+      title: "Otvoreni dani bez radnika",
+      description:
+        openDaysWithoutWorkers.length === 1
+          ? `Radno vreme je otvoreno za ${openDaysWithoutWorkers[0]}, ali nijedan radnik ne radi.`
+          : `Radno vreme je otvoreno za ${openDaysWithoutWorkers.length} dana bez ijednog radnika.`,
       href: "/admin/raspored",
       severity: "warning",
     });
@@ -880,7 +923,8 @@ export default async function AdminBookingsPage({
 
                 {(workersWithoutServices.length > 0 ||
                   servicesWithoutWorkers.length > 0 ||
-                  invalidScheduleRows.length > 0) ? (
+                  invalidScheduleRows.length > 0 ||
+                  openDaysWithoutWorkers.length > 0) ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     {workersWithoutServices.length > 0 ? (
                       <Link
@@ -914,6 +958,19 @@ export default async function AdminBookingsPage({
                         <p className="font-semibold">Smene van radnog vremena</p>
                         <p className="mt-1 text-sm">
                           Proveri raspored i smene: postoji neslaganje sa radnim vremenom salona.
+                        </p>
+                      </Link>
+                    ) : null}
+                    {openDaysWithoutWorkers.length > 0 ? (
+                      <Link
+                        href="/admin/raspored"
+                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
+                      >
+                        <p className="font-semibold">Otvoreni dani bez radnika</p>
+                        <p className="mt-1 text-sm">
+                          {openDaysWithoutWorkers.length === 1
+                            ? `Nijedan radnik ne radi za ${openDaysWithoutWorkers[0]}.`
+                            : `Nijedan radnik ne radi za: ${openDaysWithoutWorkers.join(", ")}.`}
                         </p>
                       </Link>
                     ) : null}

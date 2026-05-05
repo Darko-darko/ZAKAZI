@@ -58,6 +58,10 @@ function formatTime(value: string) {
   return value.slice(0, 5);
 }
 
+function formatShiftName(shift: Shift) {
+  return shift.name;
+}
+
 export function ScheduleMatrixForm({
   action,
   workers,
@@ -101,6 +105,7 @@ export function ScheduleMatrixForm({
   const [bulkShiftId, setBulkShiftId] = useState("");
   const [bulkCustomStart, setBulkCustomStart] = useState("");
   const [bulkCustomEnd, setBulkCustomEnd] = useState("");
+  const shiftsById = new Map(shifts.map((shift) => [shift.id, shift]));
 
   function applyBulkToDays(days: number[]) {
     setCells((current) => {
@@ -190,7 +195,7 @@ export function ScheduleMatrixForm({
               <option value="">Izaberi smenu</option>
               {shifts.map((shift) => (
                 <option key={shift.id} value={shift.id}>
-                  {shift.name} ({formatTime(shift.start_time)} - {formatTime(shift.end_time)})
+                  {formatShiftName(shift)}
                 </option>
               ))}
             </select>
@@ -241,17 +246,22 @@ export function ScheduleMatrixForm({
         </button>
       </section>
 
-      <div className="overflow-x-auto rounded-md border border-border bg-card">
-        <table className="w-full min-w-[1180px] border-collapse text-sm">
+      <div className="rounded-md border border-border bg-card">
+        <div className="border-b border-border bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground sm:hidden">
+          Prevuci tabelu levo/desno za ostale dane.
+        </div>
+
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[1660px] table-fixed border-collapse text-sm">
           <thead className="bg-muted text-left text-muted-foreground">
             <tr>
-              <th className="w-48 border-b border-border px-3 py-3 font-medium">
+              <th className="w-52 border-b border-border px-3 py-3 font-medium">
                 Radnik
               </th>
               {weekDays.map(([, dayName]) => (
                 <th
                   key={dayName}
-                  className="border-b border-border px-3 py-3 font-medium"
+                  className="w-52 border-b border-border px-3 py-3 font-medium"
                 >
                   {dayName}
                 </th>
@@ -272,9 +282,12 @@ export function ScheduleMatrixForm({
                     const key = `${worker.id}_${dayIndex}`;
                     const schedule = cells[key];
                     const mode = schedule?.mode ?? "off";
+                    const selectedShift = schedule?.shiftId
+                      ? shiftsById.get(schedule.shiftId)
+                      : null;
 
                     return (
-                      <td key={key} className="space-y-2 px-3 py-4">
+                      <td key={key} className="w-52 space-y-2 px-3 py-4">
                         <select
                           id={`mode_${key}`}
                           name={`mode_${key}`}
@@ -308,7 +321,7 @@ export function ScheduleMatrixForm({
                             <option value="">Bez smene</option>
                             {shifts.map((shift) => (
                               <option key={shift.id} value={shift.id}>
-                                {shift.name} ({formatTime(shift.start_time)}-{formatTime(shift.end_time)})
+                                {formatShiftName(shift)}
                               </option>
                             ))}
                           </select>
@@ -322,40 +335,67 @@ export function ScheduleMatrixForm({
                           />
                         )}
 
+                        {mode === "shift" && selectedShift ? (
+                          <p className="rounded-md bg-muted px-2 py-1 text-xs leading-5 text-muted-foreground">
+                            {selectedShift.name}
+                            <span className="block text-foreground">
+                              {formatTime(selectedShift.start_time)} -{" "}
+                              {formatTime(selectedShift.end_time)}
+                            </span>
+                          </p>
+                        ) : null}
+
                         {mode === "custom" ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <TimeInput
-                              id={`custom_start_${key}`}
-                              name={`custom_start_${key}`}
-                              aria-label="Custom od"
-                              value={schedule?.customStart ?? ""}
-                              onValueChange={(nextValue) =>
-                                setCells((current) => ({
-                                  ...current,
-                                  [key]: {
-                                    ...current[key],
-                                    customStart: nextValue,
-                                  },
-                                }))
-                              }
-                              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-                            />
-                            <TimeInput
-                              id={`custom_end_${key}`}
-                              name={`custom_end_${key}`}
-                              aria-label="Custom do"
-                              value={schedule?.customEnd ?? ""}
-                              onValueChange={(nextValue) =>
-                                setCells((current) => ({
-                                  ...current,
-                                  [key]: {
-                                    ...current[key],
-                                    customEnd: nextValue,
-                                  },
-                                }))
-                              }
-                              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-                            />
+                          <div className="space-y-2 rounded-md bg-muted/50 p-2">
+                            <div className="space-y-1">
+                              <label
+                                htmlFor={`custom_start_${key}`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                Od
+                              </label>
+                              <TimeInput
+                                id={`custom_start_${key}`}
+                                name={`custom_start_${key}`}
+                                aria-label="Custom od"
+                                value={schedule?.customStart ?? ""}
+                                onValueChange={(nextValue) =>
+                                  setCells((current) => ({
+                                    ...current,
+                                    [key]: {
+                                      ...current[key],
+                                      customStart: nextValue,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label
+                                htmlFor={`custom_end_${key}`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                Do
+                              </label>
+                              <TimeInput
+                                id={`custom_end_${key}`}
+                                name={`custom_end_${key}`}
+                                aria-label="Custom do"
+                                value={schedule?.customEnd ?? ""}
+                                onValueChange={(nextValue) =>
+                                  setCells((current) => ({
+                                    ...current,
+                                    [key]: {
+                                      ...current[key],
+                                      customEnd: nextValue,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                              />
+                            </div>
                           </div>
                         ) : (
                           <>
@@ -391,7 +431,8 @@ export function ScheduleMatrixForm({
               </tr>
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       <button
