@@ -1,8 +1,35 @@
 import { NextResponse } from "next/server";
 import { sendDueBookingReminders } from "@/lib/email/booking";
 
+function normalizeSecret(value: string | undefined | null) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
+function getBearerToken(authorization: string | null) {
+  const normalized = normalizeSecret(authorization);
+
+  if (!normalized.toLowerCase().startsWith("bearer ")) {
+    return "";
+  }
+
+  return normalizeSecret(normalized.slice("bearer ".length));
+}
+
 export async function POST(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = normalizeSecret(process.env.CRON_SECRET);
   const authorization = request.headers.get("authorization");
 
   if (!cronSecret) {
@@ -12,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (authorization !== `Bearer ${cronSecret}`) {
+  if (getBearerToken(authorization) !== cronSecret) {
     return NextResponse.json({ error: "Nedozvoljen pristup." }, { status: 401 });
   }
 
