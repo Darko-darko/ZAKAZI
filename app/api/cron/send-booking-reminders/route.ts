@@ -22,6 +22,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       checked: result.checked,
+      claimed: result.claimed,
+      alreadyProcessed: result.alreadyProcessed,
       sent: result.sent,
       skipped: result.skipped,
       failed: result.failed,

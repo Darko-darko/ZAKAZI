@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 type BookingNotificationRecord = {
   id: string;
   status: string;
+  created_at: string;
   starts_at: string;
   ends_at: string;
   client_name: string;
@@ -27,12 +28,15 @@ type BookingNotificationRecord = {
     custom_domain: string | null;
     billing_email: string | null;
     cancel_min_hours: number;
+    booking_reminders_enabled: boolean | null;
+    booking_reminder_hours_before: number | null;
   } | null;
 };
 
 type BookingEmailContext = {
   id: string;
   status: string;
+  createdAt: string;
   startsAt: string;
   endsAt: string;
   clientName: string;
@@ -50,6 +54,8 @@ type BookingEmailContext = {
   providerCustomDomain: string | null;
   providerBillingEmail: string | null;
   cancelMinHours: number;
+  bookingRemindersEnabled: boolean;
+  bookingReminderHoursBefore: number;
 };
 
 type BookingEmailType =
@@ -88,6 +94,8 @@ type SendBookingEmailsResult = {
 
 type SendBookingRemindersResult = {
   checked: number;
+  claimed: number;
+  alreadyProcessed: number;
   sent: number;
   skipped: number;
   failed: number;
@@ -136,6 +144,16 @@ function bookingEmailsEnabled() {
 
 function bookingAdminNotificationsEnabled() {
   return readBooleanEnv(process.env.BOOKING_ADMIN_NOTIFICATIONS_ENABLED, true);
+}
+
+function bookingReminderDefaultHoursBefore() {
+  const value = Number(process.env.BOOKING_REMINDER_HOURS_BEFORE ?? 2);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return 2;
+  }
+
+  return Math.round(value);
 }
 
 function escapeHtml(value: string) {
@@ -196,6 +214,15 @@ function formatDuration(minutes: number) {
   return mins === 0 ? `${hours} h` : `${hours} h ${mins} min`;
 }
 
+function formatReminderLead(hours: number) {
+  if (hours < 24) {
+    return hours === 1 ? "oko 1 sat" : `oko ${hours} sata`;
+  }
+
+  const days = Math.round(hours / 24);
+  return days === 1 ? "oko 24 sata" : `oko ${days} dana`;
+}
+
 function formatPublicBaseUrl(context: Pick<BookingEmailContext, "providerCustomDomain" | "providerSlug">) {
   if (context.providerCustomDomain) {
     return `https://${context.providerCustomDomain}`;
@@ -209,7 +236,7 @@ function formatCancellationUrl(context: Pick<BookingEmailContext, "providerCusto
 }
 
 function buildClientReminderSubject(context: BookingEmailContext) {
-  return `Podsetnik za termin danas u ${formatTime(context.startsAt)} Â· ${context.providerName}`;
+  return `Podsetnik za termin - ${formatSubjectDate(context.startsAt)} - ${context.providerName}`;
 }
 
 function buildClientBookingSubject(context: BookingEmailContext) {
@@ -267,6 +294,7 @@ function mapRecordToContext(record: BookingNotificationRecord): BookingEmailCont
   return {
     id: record.id,
     status: record.status,
+    createdAt: record.created_at,
     startsAt: record.starts_at,
     endsAt: record.ends_at,
     clientName: record.client_name,
@@ -284,6 +312,11 @@ function mapRecordToContext(record: BookingNotificationRecord): BookingEmailCont
     providerCustomDomain: record.providers.custom_domain,
     providerBillingEmail: record.providers.billing_email,
     cancelMinHours: record.providers.cancel_min_hours,
+    bookingRemindersEnabled:
+      record.providers.booking_reminders_enabled ?? true,
+    bookingReminderHoursBefore:
+      record.providers.booking_reminder_hours_before ??
+      bookingReminderDefaultHoursBefore(),
   };
 }
 
@@ -295,7 +328,7 @@ async function getBookingContextByQuery(
   const { data, error } = await admin
     .from("bookings")
     .select(
-      "id, status, starts_at, ends_at, client_name, client_phone, client_email, notes, cancel_token, services(name, duration_minutes, price), workers(name), providers(id, name, slug, custom_domain, billing_email, cancel_min_hours)",
+      "id, status, created_at, starts_at, ends_at, client_name, client_phone, client_email, notes, cancel_token, services(name, duration_minutes, price), workers(name), providers(id, name, slug, custom_domain, billing_email, cancel_min_hours, booking_reminders_enabled, booking_reminder_hours_before)",
     )
     .eq(column, value)
     .maybeSingle();
@@ -551,6 +584,7 @@ function buildClientCancellationText(context: BookingEmailContext) {
 }
 
 function buildClientReminderEmail(context: BookingEmailContext) {
+  const leadLabel = formatReminderLead(context.bookingReminderHoursBefore);
   const cancellationBlock = canClientCancelBooking(context)
     ? `
       <div style="margin-top: 20px; padding: 16px 18px; border-radius: 16px; background: #f8fafc; border: 1px solid #e2e8f0;">
@@ -570,7 +604,7 @@ function buildClientReminderEmail(context: BookingEmailContext) {
       <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #0f766e;">
         Podsetnik za termin
       </p>
-      <h1 style="margin: 0 0 16px; font-size: 24px; line-height: 1.25;">Tvoj termin pocinje za oko 2 sata</h1>
+      <h1 style="margin: 0 0 16px; font-size: 24px; line-height: 1.25;">Tvoj termin pocinje za ${escapeHtml(leadLabel)}</h1>
       <p style="margin: 0 0 14px;">Zdravo ${escapeHtml(context.clientName)},</p>
       <p style="margin: 0 0 18px; color: #334155;">
         Podsecamo te na termin kod salona <strong>${escapeHtml(context.providerName)}</strong>.
@@ -601,11 +635,12 @@ function buildClientReminderEmail(context: BookingEmailContext) {
 }
 
 function buildClientReminderText(context: BookingEmailContext) {
+  const leadLabel = formatReminderLead(context.bookingReminderHoursBefore);
   const lines = [
     "Podsetnik za termin",
     "",
     `Zdravo ${context.clientName},`,
-    `Tvoj termin kod salona ${context.providerName} pocinje za oko 2 sata.`,
+    `Tvoj termin kod salona ${context.providerName} pocinje za ${leadLabel}.`,
     "",
     `Termin: ${formatDateTime(context.startsAt)}`,
     `Usluga: ${context.serviceName}`,
@@ -814,6 +849,49 @@ async function sendAndLogBookingEmail(params: {
   }
 }
 
+async function sendBookingEmailWithoutLog(params: {
+  recipientEmail: string;
+  recipientName?: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  replyTo?: { email: string; name?: string };
+  tags: string[];
+}): Promise<BookingEmailAttempt> {
+  try {
+    const result = await sendEmail({
+      to: [
+        {
+          email: params.recipientEmail,
+          name: params.recipientName,
+        },
+      ],
+      subject: params.subject,
+      htmlContent: params.htmlContent,
+      textContent: params.textContent,
+      replyTo: params.replyTo,
+      tags: params.tags,
+    });
+
+    return {
+      status: "sent",
+      recipientEmail: params.recipientEmail,
+      subject: params.subject,
+      brevoMessageId: result.messageId,
+      errorMessage: null,
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      recipientEmail: params.recipientEmail,
+      subject: params.subject,
+      brevoMessageId: null,
+      errorMessage:
+        error instanceof Error ? error.message : "Nepoznata greska pri slanju emaila.",
+    };
+  }
+}
+
 export async function sendBookingEmails(
   bookingId: string,
   options: SendBookingEmailsOptions = {},
@@ -901,91 +979,166 @@ export async function sendBookingEmails(
 
 async function listDueReminderContexts() {
   const admin = createAdminClient();
-  const windowStart = new Date(Date.now() + 115 * 60 * 1000).toISOString();
-  const windowEnd = new Date(Date.now() + 125 * 60 * 1000).toISOString();
+  const now = new Date();
+  const lookupEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await admin
     .from("bookings")
     .select(
-      "id, status, starts_at, ends_at, client_name, client_phone, client_email, notes, cancel_token, services(name, duration_minutes, price), workers(name), providers(id, name, slug, custom_domain, billing_email, cancel_min_hours)",
+      "id, status, created_at, starts_at, ends_at, client_name, client_phone, client_email, notes, cancel_token, services(name, duration_minutes, price), workers(name), providers(id, name, slug, custom_domain, billing_email, cancel_min_hours, booking_reminders_enabled, booking_reminder_hours_before)",
     )
     .eq("status", "confirmed")
-    .not("client_email", "is", null)
-    .gte("starts_at", windowStart)
-    .lt("starts_at", windowEnd);
+    .gt("starts_at", now.toISOString())
+    .lte("starts_at", lookupEnd);
 
   if (error) {
     throw new Error(`Ucitavanje booking remindera nije uspelo: ${error.message}`);
   }
 
-  return (data ?? []).map((record) =>
-    mapRecordToContext(record as BookingNotificationRecord),
-  );
+  return (data ?? [])
+    .map((record) => mapRecordToContext(record as BookingNotificationRecord))
+    .filter((context) => {
+      const reminderDueAt = new Date(
+        new Date(context.startsAt).getTime() -
+          context.bookingReminderHoursBefore * 60 * 60 * 1000,
+      );
+
+      return now.getTime() >= reminderDueAt.getTime();
+    });
 }
 
-async function wasReminderAlreadySent(bookingId: string) {
+async function claimBookingReminderLog(context: BookingEmailContext) {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("booking_email_logs")
-    .select("id")
-    .eq("booking_id", bookingId)
-    .eq("email_type", "reminder_client")
-    .eq("trigger_source", "reminder_cron")
-    .eq("status", "sent")
-    .limit(1)
-    .maybeSingle();
+  const rpc = admin.rpc as unknown as <T>(
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: T | null; error: { message: string } | null }>;
+  const { data, error } = await rpc<string>(
+    "claim_booking_reminder_email_log",
+    {
+      p_booking_id: context.id,
+      p_provider_id: context.providerId,
+      p_recipient_email: context.clientEmail,
+      p_subject: buildClientReminderSubject(context),
+    },
+  );
 
   if (error) {
     throw new Error(
-      `Provera prethodno poslatog reminder emaila nije uspela: ${error.message}`,
+      `Claim booking reminder loga nije uspeo: ${error.message}`,
     );
   }
 
-  return Boolean(data);
+  return data;
+}
+
+async function completeClaimedBookingReminderLog(
+  logId: string,
+  attempt: BookingEmailAttempt,
+) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("booking_email_logs")
+    .update({
+      recipient_email: attempt.recipientEmail,
+      subject: attempt.subject,
+      status: attempt.status,
+      brevo_message_id: attempt.brevoMessageId,
+      error_message: attempt.errorMessage,
+      sent_at: attempt.status === "sent" ? new Date().toISOString() : null,
+    })
+    .eq("id", logId);
+
+  if (error) {
+    throw new Error(`Azuriranje booking reminder loga nije uspelo: ${error.message}`);
+  }
+}
+
+function buildReminderSkipAttempt(
+  context: BookingEmailContext,
+  reason: string,
+): BookingEmailAttempt {
+  return {
+    status: "skipped",
+    recipientEmail: context.clientEmail,
+    subject: buildClientReminderSubject(context),
+    brevoMessageId: null,
+    errorMessage: reason,
+  };
+}
+
+async function sendClaimedBookingReminder(
+  context: BookingEmailContext,
+): Promise<BookingEmailAttempt> {
+  if (!context.clientEmail) {
+    return buildReminderSkipAttempt(context, "Klijent nema email adresu.");
+  }
+
+  if (!context.bookingRemindersEnabled) {
+    return buildReminderSkipAttempt(context, "Booking reminder emailovi su iskljuceni za providera.");
+  }
+
+  if (!bookingEmailsEnabled()) {
+    return buildReminderSkipAttempt(context, "BOOKING_EMAILS_ENABLED=false");
+  }
+
+  const reminderDueAt = new Date(
+    new Date(context.startsAt).getTime() -
+      context.bookingReminderHoursBefore * 60 * 60 * 1000,
+  );
+
+  if (new Date(context.createdAt).getTime() >= reminderDueAt.getTime()) {
+    return buildReminderSkipAttempt(
+      context,
+      "Booking je napravljen nakon reminder roka; confirmation email je dovoljan.",
+    );
+  }
+
+  const minimumLeadMs = 30 * 60 * 1000;
+  if (new Date(context.startsAt).getTime() - Date.now() < minimumLeadMs) {
+    return buildReminderSkipAttempt(
+      context,
+      "Reminder rok je propusten i termin pocinje za manje od 30 minuta.",
+    );
+  }
+
+  return sendBookingEmailWithoutLog({
+    recipientEmail: context.clientEmail,
+    recipientName: context.clientName,
+    subject: buildClientReminderSubject(context),
+    htmlContent: buildClientReminderEmail(context),
+    textContent: buildClientReminderText(context),
+    tags: ["booking-reminder", context.providerSlug],
+    replyTo: context.providerBillingEmail
+      ? {
+          email: context.providerBillingEmail,
+          name: context.providerName,
+        }
+      : undefined,
+  });
 }
 
 export async function sendDueBookingReminders(): Promise<SendBookingRemindersResult> {
   const contexts = await listDueReminderContexts();
+  let claimed = 0;
+  let alreadyProcessed = 0;
   let sent = 0;
   let skipped = 0;
   let failed = 0;
 
   for (const context of contexts) {
-    if (await wasReminderAlreadySent(context.id)) {
-      skipped += 1;
+    const logId = await claimBookingReminderLog(context);
+
+    if (!logId) {
+      alreadyProcessed += 1;
       continue;
     }
 
-    if (!bookingEmailsEnabled()) {
-      await skipBookingEmail({
-        context,
-        emailType: "reminder_client",
-        triggerSource: "reminder_cron",
-        recipientEmail: context.clientEmail,
-        subject: buildClientReminderSubject(context),
-        reason: "BOOKING_EMAILS_ENABLED=false",
-      });
-      skipped += 1;
-      continue;
-    }
+    claimed += 1;
 
-    const attempt = await sendAndLogBookingEmail({
-      context,
-      emailType: "reminder_client",
-      triggerSource: "reminder_cron",
-      recipientEmail: context.clientEmail,
-      recipientName: context.clientName,
-      subject: buildClientReminderSubject(context),
-      htmlContent: buildClientReminderEmail(context),
-      textContent: buildClientReminderText(context),
-      tags: ["booking-reminder", context.providerSlug],
-      replyTo: context.providerBillingEmail
-        ? {
-            email: context.providerBillingEmail,
-            name: context.providerName,
-          }
-        : undefined,
-    });
+    const attempt = await sendClaimedBookingReminder(context);
+
+    await completeClaimedBookingReminderLog(logId, attempt);
 
     if (attempt.status === "sent") {
       sent += 1;
@@ -998,6 +1151,8 @@ export async function sendDueBookingReminders(): Promise<SendBookingRemindersRes
 
   return {
     checked: contexts.length,
+    claimed,
+    alreadyProcessed,
     sent,
     skipped,
     failed,

@@ -543,6 +543,8 @@ export type Database = {
           billing_email: string | null
           booking_max_days_ahead: number
           booking_min_notice_hours: number
+          booking_reminder_hours_before: number
+          booking_reminders_enabled: boolean
           cancel_min_hours: number
           city: string | null
           company_address: string | null
@@ -586,6 +588,8 @@ export type Database = {
           billing_email?: string | null
           booking_max_days_ahead?: number
           booking_min_notice_hours?: number
+          booking_reminder_hours_before?: number
+          booking_reminders_enabled?: boolean
           cancel_min_hours?: number
           city?: string | null
           company_address?: string | null
@@ -629,6 +633,8 @@ export type Database = {
           billing_email?: string | null
           booking_max_days_ahead?: number
           booking_min_notice_hours?: number
+          booking_reminder_hours_before?: number
+          booking_reminders_enabled?: boolean
           cancel_min_hours?: number
           city?: string | null
           company_address?: string | null
@@ -1065,6 +1071,15 @@ export type Database = {
       claim_invoice_payment: {
         Args: { p_payment_claim_token: string; p_payment_proof_url?: string }
         Returns: boolean
+      }
+      claim_booking_reminder_email_log: {
+        Args: {
+          p_booking_id: string
+          p_provider_id: string
+          p_recipient_email: string | null
+          p_subject: string | null
+        }
+        Returns: string | null
       }
       create_public_booking: {
         Args: {
