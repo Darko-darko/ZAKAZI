@@ -205,19 +205,26 @@ export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
                   </p>
                 </div>
 
-                <label className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground">
-                  <input
-                    type="checkbox"
-                    name={`closed_${dayIndex}`}
-                    checked={item?.isClosed ?? false}
-                    onChange={(event) => {
-                      const isClosed = event.target.checked;
+                <div className="flex items-center gap-2">
+                  {item?.isClosed ? (
+                    <input
+                      type="hidden"
+                      name={`closed_${dayIndex}`}
+                      value="on"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={item?.isClosed ?? false}
+                    onClick={() => {
+                      const isClosed = !(item?.isClosed ?? false);
                       const opensAt = isClosed
                         ? ""
-                        : item?.opensAt || bulkOpensAt || "09:00";
+                        : bulkOpensAt || item?.opensAt || "09:00";
                       const closesAt = isClosed
                         ? ""
-                        : item?.closesAt || bulkClosesAt || "17:00";
+                        : bulkClosesAt || item?.closesAt || "17:00";
 
                       if (!isClosed) {
                         rememberBulkTime(opensAt, closesAt);
@@ -233,10 +240,16 @@ export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
                         },
                       }));
                     }}
-                    className="size-4 accent-primary"
-                  />
-                  Ne radi
-                </label>
+                    className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+                  >
+                    <span className="flex size-4 items-center justify-center rounded border border-input bg-background">
+                      {item?.isClosed ? (
+                        <span className="mb-0.5 h-2 w-1.5 rotate-45 border-b-2 border-r-2 border-primary" />
+                      ) : null}
+                    </span>
+                    Ne radi
+                  </button>
+                </div>
               </div>
 
               {item?.isClosed ? (

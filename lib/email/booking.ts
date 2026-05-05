@@ -216,11 +216,11 @@ function formatDuration(minutes: number) {
 
 function formatReminderLead(hours: number) {
   if (hours < 24) {
-    return hours === 1 ? "oko 1 sat" : `oko ${hours} sata`;
+    return hours === 1 ? "1 sat" : `${hours} sata`;
   }
 
   const days = Math.round(hours / 24);
-  return days === 1 ? "oko 24 sata" : `oko ${days} dana`;
+  return days === 1 ? "24 sata" : `${days} dana`;
 }
 
 function formatPublicBaseUrl(context: Pick<BookingEmailContext, "providerCustomDomain" | "providerSlug">) {
