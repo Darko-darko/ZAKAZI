@@ -65,25 +65,12 @@ type ManualSlot = {
   ends_at: string;
 };
 
-type SetupStep = {
-  key:
-    | "services"
-    | "workers"
-    | "worker_services"
-    | "working_hours"
-    | "worker_schedule";
-  label: string;
-  description: string;
-  href: string;
-  done: boolean;
-};
-
 type AdminAlert = {
   key: string;
   title: string;
   description: string;
   href: string;
-  severity: "critical" | "warning" | "success";
+  severity: "critical" | "success";
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -285,10 +272,6 @@ function alertTone(severity: AdminAlert["severity"]) {
     return "border-destructive/30 bg-destructive/10 text-destructive";
   }
 
-  if (severity === "warning") {
-    return "border-amber-300/50 bg-amber-50 text-amber-800";
-  }
-
   return "border-emerald-300/40 bg-emerald-50 text-emerald-800";
 }
 
@@ -297,11 +280,19 @@ function alertBadge(severity: AdminAlert["severity"]) {
     return "Hitno";
   }
 
-  if (severity === "warning") {
-    return "Pazi";
+  return "OK";
+}
+
+function alertsHeadline(count: number) {
+  if (count === 1) {
+    return "Jedna stavka trazi paznju";
   }
 
-  return "OK";
+  if (count >= 2 && count <= 4) {
+    return `${count} stavke traze paznju`;
+  }
+
+  return `${count} stavki trazi paznju`;
 }
 
 export default async function AdminBookingsPage({
@@ -455,105 +446,130 @@ export default async function AdminBookingsPage({
 
     return [dayName];
   });
-  const hasCompleteWorkerSchedule =
-    hasWorkerSchedule && openDaysWithoutWorkers.length === 0;
-  const setupSteps: SetupStep[] = [
-    {
-      key: "services",
-      label: "Aktivne usluge",
-      description: "Potrebna je bar jedna aktivna usluga da bi klijent imao sta da zakaze.",
-      href: "/admin/usluge",
-      done: serviceIds.size > 0,
-    },
-    {
-      key: "workers",
-      label: "Dostupni radnici",
-      description: "Potreban je bar jedan radnik koji moze da prima online termine.",
-      href: "/admin/radnici",
-      done: workerIds.size > 0,
-    },
-    {
-      key: "worker_services",
-      label: "Povezane usluge",
-      description: "Svaki radnik treba da ima dodeljene usluge koje stvarno radi.",
-      href: "/admin/radnici",
-      done: hasWorkerServiceAssignments,
-    },
-    {
-      key: "working_hours",
-      label: "Radno vreme",
-      description: "Ovo je osnovni okvir u kom salon ili studio uopste prima termine.",
-      href: "/admin/radno-vreme",
-      done: hasOpenWorkingHours,
-    },
-    {
-      key: "worker_schedule",
-      label: "Raspored radnika",
-      description:
-        openDaysWithoutWorkers.length > 0
-          ? openDaysWithoutWorkers.length === 1
-            ? `Dodaj radnika za ${openDaysWithoutWorkers[0]} ili zatvori taj dan u radnom vremenu.`
-            : `Dodaj radnike za otvorene dane bez pokrica: ${openDaysWithoutWorkers.join(", ")}.`
-          : "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
-      href: "/admin/raspored",
-      done: hasCompleteWorkerSchedule,
-    },
+  const setupCompleted = [
+    serviceIds.size > 0,
+    workerIds.size > 0,
+    hasWorkerServiceAssignments &&
+      workersWithoutServices.length === 0 &&
+      servicesWithoutWorkers.length === 0,
+    hasOpenWorkingHours,
+    hasWorkerSchedule &&
+      openDaysWithoutWorkers.length === 0 &&
+      invalidScheduleRows.length === 0,
   ];
-  const completedSetupSteps = setupSteps.filter((step) => step.done).length;
-  const bookingSetupReady = completedSetupSteps === setupSteps.length;
-  const missingSetupSteps = setupSteps.filter((step) => !step.done);
+  const totalSetupSteps = setupCompleted.length;
+  const completedSetupSteps = setupCompleted.filter(Boolean).length;
+  const bookingSetupReady = completedSetupSteps === totalSetupSteps;
   const alerts: AdminAlert[] = [];
 
-  for (const step of missingSetupSteps) {
+  if (serviceIds.size === 0) {
     alerts.push({
-      key: step.key,
-      title: step.label,
-      description: step.description,
-      href: step.href,
+      key: "services",
+      title: "Aktivne usluge",
+      description: "Potrebna je bar jedna aktivna usluga da bi klijent imao sta da zakaze.",
+      href: "/admin/usluge",
       severity: "critical",
     });
   }
 
-  if (workersWithoutServices.length > 0) {
+  if (workerIds.size === 0) {
     alerts.push({
-      key: "workers_without_services",
-      title: "Radnici bez usluga",
-      description:
-        workersWithoutServices.length === 1
-          ? "Jedan radnik je aktivan, ali nema nijednu dodeljenu uslugu."
-          : `${workersWithoutServices.length} radnika su aktivna, ali nemaju dodeljene usluge.`,
+      key: "workers",
+      title: "Dostupni radnici",
+      description: "Potreban je bar jedan radnik koji moze da prima online termine.",
       href: "/admin/radnici",
-      severity: "warning",
+      severity: "critical",
     });
   }
 
-  if (servicesWithoutWorkers.length > 0) {
+  if (workerIds.size > 0 && serviceIds.size > 0) {
+    if (!hasWorkerServiceAssignments) {
+      alerts.push({
+        key: "worker_services",
+        title: "Povezane usluge",
+        description: "Svaki radnik treba da ima dodeljene usluge koje stvarno radi.",
+        href: "/admin/radnici",
+        severity: "critical",
+      });
+    } else {
+      if (workersWithoutServices.length > 0) {
+        const names = workersWithoutServices.map((worker) => worker.name).join(", ");
+        alerts.push({
+          key: "workers_without_services",
+          title: "Radnici bez usluga",
+          description:
+            workersWithoutServices.length === 1
+              ? `${names} nema dodeljene usluge.`
+              : `${workersWithoutServices.length} radnika nemaju dodeljene usluge: ${names}.`,
+          href: "/admin/radnici",
+          severity: "critical",
+        });
+      }
+
+      if (servicesWithoutWorkers.length > 0) {
+        alerts.push({
+          key: "services_without_workers",
+          title: "Aktivne usluge bez radnika",
+          description:
+            servicesWithoutWorkers.length === 1
+              ? "Jedna aktivna usluga nema nijednog radnika koji je izvodi."
+              : `${servicesWithoutWorkers.length} aktivnih usluga nema dodeljene radnike.`,
+          href: "/admin/usluge",
+          severity: "critical",
+        });
+      }
+    }
+  }
+
+  if (!hasOpenWorkingHours) {
     alerts.push({
-      key: "services_without_workers",
-      title: "Usluge bez radnika",
-      description:
-        servicesWithoutWorkers.length === 1
-          ? "Jedna aktivna usluga nema nijednog radnika koji je izvodi."
-          : `${servicesWithoutWorkers.length} aktivnih usluga nema dodeljene radnike.`,
-      href: "/admin/usluge",
-      severity: "warning",
+      key: "working_hours",
+      title: "Radno vreme",
+      description: "Ovo je osnovni okvir u kom salon ili studio uopste prima termine.",
+      href: "/admin/radno-vreme",
+      severity: "critical",
     });
   }
 
-  if (invalidScheduleRows.length > 0) {
-    alerts.push({
-      key: "schedule_outside_hours",
-      title: "Smene izlaze van radnog vremena",
-      description:
-        invalidScheduleRows.length === 1
-          ? "Jedna smena ili raspored je van otvorenog radnog vremena."
-          : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
-      href: "/admin/raspored",
-      severity: "warning",
-    });
+  if (workerIds.size > 0 && hasOpenWorkingHours) {
+    if (!hasWorkerSchedule) {
+      alerts.push({
+        key: "worker_schedule",
+        title: "Raspored radnika",
+        description: "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
+        href: "/admin/raspored",
+        severity: "critical",
+      });
+    } else {
+      if (openDaysWithoutWorkers.length > 0) {
+        alerts.push({
+          key: "open_days_without_workers",
+          title: "Raspored radnika",
+          description:
+            openDaysWithoutWorkers.length === 1
+              ? `Dodaj radnika za ${openDaysWithoutWorkers[0]} ili zatvori taj dan u radnom vremenu.`
+              : `Dodaj radnike za otvorene dane bez pokrica: ${openDaysWithoutWorkers.join(", ")}.`,
+          href: "/admin/raspored",
+          severity: "critical",
+        });
+      }
+
+      if (invalidScheduleRows.length > 0) {
+        alerts.push({
+          key: "schedule_outside_hours",
+          title: "Smene van radnog vremena",
+          description:
+            invalidScheduleRows.length === 1
+              ? "Jedna smena ili raspored je van otvorenog radnog vremena."
+              : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+          href: "/admin/raspored",
+          severity: "critical",
+        });
+      }
+    }
   }
 
-  if (bookingSetupReady && alerts.length === 0) {
+  if (alerts.length === 0) {
     alerts.push({
       key: "ready",
       title: "Online zakazivanje je spremno",
@@ -564,7 +580,7 @@ export default async function AdminBookingsPage({
     });
   }
 
-  const primaryAlerts = alerts.filter((alert) => alert.severity !== "success").slice(0, 3);
+  const primaryAlerts = alerts.filter((alert) => alert.severity !== "success");
   const hasHealthyStatusOnly =
     primaryAlerts.length === 0 && alerts.some((alert) => alert.severity === "success");
 
@@ -812,27 +828,25 @@ export default async function AdminBookingsPage({
                 <h2 className="mt-2 text-xl font-bold tracking-tight text-foreground">
                   {hasHealthyStatusOnly
                     ? "Sve kljucne stvari su pod kontrolom"
-                    : primaryAlerts.length === 1
-                      ? "Jedna stavka trazi paznju"
-                      : `${primaryAlerts.length} stavke traze paznju`}
+                    : alertsHeadline(primaryAlerts.length)}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Kratak pregled onoga sto moze da blokira ili uspori online zakazivanje.
+                  Kratak pregled onoga sto moze da blokira online zakazivanje.
                 </p>
               </div>
               <div className="min-w-[220px] rounded-2xl border border-primary/15 bg-primary/6 p-4">
                 <p className="text-sm font-semibold text-primary">
-                  Spremnost: {completedSetupSteps}/{setupSteps.length}
+                  Spremnost: {completedSetupSteps}/{totalSetupSteps}
                 </p>
                 <div className="mt-3 h-3 overflow-hidden rounded-full bg-primary/10">
                   <div
                     className="h-full rounded-full bg-primary transition-[width]"
-                    style={{ width: setupProgressWidth(completedSetupSteps, setupSteps.length) }}
+                    style={{ width: setupProgressWidth(completedSetupSteps, totalSetupSteps) }}
                   />
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {bookingSetupReady
-                    ? "Osnovna postavka je spremna. Detalji ispod pomazu da sve ostane uredno."
+                    ? "Osnovna postavka je spremna i javna strana radi bez prepreka."
                     : "Dopuni kljucne stavke da bi javna strana sigurno nudila slobodne termine."}
                 </p>
               </div>
@@ -863,115 +877,6 @@ export default async function AdminBookingsPage({
                 ))}
               </div>
             )}
-
-            <details className="rounded-xl border border-border/80 bg-background/95">
-              <summary className="cursor-pointer list-none px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      Detaljan status online zakazivanja
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Pregled svih kontrolnih tacaka, odstupanja i precica za ispravku.
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground">
-                    {alerts.length} stavki
-                  </span>
-                </div>
-              </summary>
-
-              <div className="border-t border-border px-4 py-4">
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {setupSteps.map((step, index) => (
-                    <Link
-                      key={step.key}
-                      href={step.href}
-                      className="rounded-xl border border-border/80 bg-card p-4 transition hover:border-primary/30 hover:bg-background"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span
-                          className={
-                            step.done
-                              ? "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
-                              : "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground"
-                          }
-                        >
-                          {step.done ? "OK" : index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-foreground">{step.label}</p>
-                            <span className="text-xs text-muted-foreground">
-                              {step.done ? "U redu" : "Nedostaje"}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {step.description}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-
-                {(workersWithoutServices.length > 0 ||
-                  servicesWithoutWorkers.length > 0 ||
-                  invalidScheduleRows.length > 0 ||
-                  openDaysWithoutWorkers.length > 0) ? (
-                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    {workersWithoutServices.length > 0 ? (
-                      <Link
-                        href="/admin/radnici"
-                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
-                      >
-                        <p className="font-semibold">Radnici bez usluga</p>
-                        <p className="mt-1 text-sm">
-                          {workersWithoutServices.map((worker) => worker.name).join(", ")}
-                        </p>
-                      </Link>
-                    ) : null}
-                    {servicesWithoutWorkers.length > 0 ? (
-                      <Link
-                        href="/admin/usluge"
-                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
-                      >
-                        <p className="font-semibold">Aktivne usluge bez radnika</p>
-                        <p className="mt-1 text-sm">
-                          {servicesWithoutWorkers.length === 1
-                            ? "Jedna usluga nema dodeljenog radnika."
-                            : `${servicesWithoutWorkers.length} usluge nemaju dodeljene radnike.`}
-                        </p>
-                      </Link>
-                    ) : null}
-                    {invalidScheduleRows.length > 0 ? (
-                      <Link
-                        href="/admin/raspored"
-                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
-                      >
-                        <p className="font-semibold">Smene van radnog vremena</p>
-                        <p className="mt-1 text-sm">
-                          Proveri raspored i smene: postoji neslaganje sa radnim vremenom salona.
-                        </p>
-                      </Link>
-                    ) : null}
-                    {openDaysWithoutWorkers.length > 0 ? (
-                      <Link
-                        href="/admin/raspored"
-                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
-                      >
-                        <p className="font-semibold">Otvoreni dani bez radnika</p>
-                        <p className="mt-1 text-sm">
-                          {openDaysWithoutWorkers.length === 1
-                            ? `Nijedan radnik ne radi za ${openDaysWithoutWorkers[0]}.`
-                            : `Nijedan radnik ne radi za: ${openDaysWithoutWorkers.join(", ")}.`}
-                        </p>
-                      </Link>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </details>
           </div>
         </section>
 
