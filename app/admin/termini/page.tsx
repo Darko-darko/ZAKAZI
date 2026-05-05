@@ -78,6 +78,14 @@ type SetupStep = {
   done: boolean;
 };
 
+type AdminAlert = {
+  key: string;
+  title: string;
+  description: string;
+  href: string;
+  severity: "critical" | "warning" | "success";
+};
+
 const STATUS_LABELS: Record<string, string> = {
   active: "Zakazani",
   confirmed: "Zakazan",
@@ -262,6 +270,30 @@ function setupProgressWidth(completed: number, total: number) {
   return `${Math.round((completed / total) * 100)}%`;
 }
 
+function alertTone(severity: AdminAlert["severity"]) {
+  if (severity === "critical") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+
+  if (severity === "warning") {
+    return "border-amber-300/50 bg-amber-50 text-amber-800";
+  }
+
+  return "border-emerald-300/40 bg-emerald-50 text-emerald-800";
+}
+
+function alertBadge(severity: AdminAlert["severity"]) {
+  if (severity === "critical") {
+    return "Hitno";
+  }
+
+  if (severity === "warning") {
+    return "Pazi";
+  }
+
+  return "OK";
+}
+
 export default async function AdminBookingsPage({
   searchParams,
 }: AdminBookingsPageProps) {
@@ -295,6 +327,7 @@ export default async function AdminBookingsPage({
     { data: workerServices },
     { data: workingHours },
     { data: workerSchedules },
+    { data: shifts },
     { count: todayActiveCount },
     { count: tomorrowActiveCount },
   ] = await Promise.all([
@@ -314,11 +347,15 @@ export default async function AdminBookingsPage({
       .select("worker_id, service_id"),
     supabase
       .from("provider_working_hours")
-      .select("id, is_closed")
+      .select("id, day_of_week, opens_at, closes_at, is_closed")
       .eq("provider_id", provider.id),
     supabase
       .from("worker_schedule")
-      .select("id, worker_id"),
+      .select("id, worker_id, day_of_week, shift_id"),
+    supabase
+      .from("shifts")
+      .select("id, name, start_time, end_time")
+      .eq("provider_id", provider.id),
     supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })
@@ -351,6 +388,43 @@ export default async function AdminBookingsPage({
   const hasWorkerSchedule = (workerSchedules ?? []).some((row) =>
     workerIds.has(row.worker_id),
   );
+  const workingHoursByDay = new Map(
+    (workingHours ?? []).map((row) => [row.day_of_week, row]),
+  );
+  const shiftsById = new Map((shifts ?? []).map((shift) => [shift.id, shift]));
+  const serviceAssignmentsByWorker = new Map<string, number>();
+
+  for (const assignment of workerServices ?? []) {
+    serviceAssignmentsByWorker.set(
+      assignment.worker_id,
+      (serviceAssignmentsByWorker.get(assignment.worker_id) ?? 0) + 1,
+    );
+  }
+
+  const workersWithoutServices = (workers ?? []).filter(
+    (worker) => (serviceAssignmentsByWorker.get(worker.id) ?? 0) === 0,
+  );
+  const servicesWithoutWorkers = (services ?? []).filter((service) => {
+    if (!service.is_active) {
+      return false;
+    }
+
+    return !(workerServices ?? []).some((assignment) => assignment.service_id === service.id);
+  });
+  const invalidScheduleRows = (workerSchedules ?? []).filter((row) => {
+    const day = workingHoursByDay.get(row.day_of_week);
+    const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
+
+    if (!day || day.is_closed) {
+      return Boolean(shift);
+    }
+
+    if (!shift || !day.opens_at || !day.closes_at) {
+      return false;
+    }
+
+    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+  });
   const setupSteps: SetupStep[] = [
     {
       key: "services",
@@ -390,6 +464,72 @@ export default async function AdminBookingsPage({
   ];
   const completedSetupSteps = setupSteps.filter((step) => step.done).length;
   const bookingSetupReady = completedSetupSteps === setupSteps.length;
+  const missingSetupSteps = setupSteps.filter((step) => !step.done);
+  const alerts: AdminAlert[] = [];
+
+  for (const step of missingSetupSteps) {
+    alerts.push({
+      key: step.key,
+      title: step.label,
+      description: step.description,
+      href: step.href,
+      severity: "critical",
+    });
+  }
+
+  if (workersWithoutServices.length > 0) {
+    alerts.push({
+      key: "workers_without_services",
+      title: "Radnici bez usluga",
+      description:
+        workersWithoutServices.length === 1
+          ? "Jedan radnik je aktivan, ali nema nijednu dodeljenu uslugu."
+          : `${workersWithoutServices.length} radnika su aktivna, ali nemaju dodeljene usluge.`,
+      href: "/admin/radnici",
+      severity: "warning",
+    });
+  }
+
+  if (servicesWithoutWorkers.length > 0) {
+    alerts.push({
+      key: "services_without_workers",
+      title: "Usluge bez radnika",
+      description:
+        servicesWithoutWorkers.length === 1
+          ? "Jedna aktivna usluga nema nijednog radnika koji je izvodi."
+          : `${servicesWithoutWorkers.length} aktivnih usluga nema dodeljene radnike.`,
+      href: "/admin/usluge",
+      severity: "warning",
+    });
+  }
+
+  if (invalidScheduleRows.length > 0) {
+    alerts.push({
+      key: "schedule_outside_hours",
+      title: "Smene izlaze van radnog vremena",
+      description:
+        invalidScheduleRows.length === 1
+          ? "Jedna smena ili raspored je van otvorenog radnog vremena."
+          : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+      href: "/admin/raspored",
+      severity: "warning",
+    });
+  }
+
+  if (bookingSetupReady && alerts.length === 0) {
+    alerts.push({
+      key: "ready",
+      title: "Online zakazivanje je spremno",
+      description:
+        "Javna strana trenutno ima osnovne podatke za slobodne termine i rucni unos.",
+      href: "/admin/sajt",
+      severity: "success",
+    });
+  }
+
+  const primaryAlerts = alerts.filter((alert) => alert.severity !== "success").slice(0, 3);
+  const hasHealthyStatusOnly =
+    primaryAlerts.length === 0 && alerts.some((alert) => alert.severity === "success");
 
   let bookingsQuery = supabase
     .from("bookings")
@@ -625,72 +765,162 @@ export default async function AdminBookingsPage({
           </div>
         </nav>
 
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Status online zakazivanja
-              </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-                {bookingSetupReady
-                  ? "Sistem je spreman da prima online termine"
-                  : "Proveri sta jos nedostaje za online zakazivanje"}
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Ovaj blok ostaje koristan i kasnije: brzo pokazuje da li javna
-                strana trenutno ima sve sto joj treba da prikaze slobodne
-                termine bez praznih koraka i zabune za klijenta.
-              </p>
-            </div>
-            <div className="min-w-[220px] rounded-2xl border border-primary/15 bg-primary/6 p-4">
-              <p className="text-sm font-semibold text-primary">
-                Spremnost: {completedSetupSteps}/{setupSteps.length}
-              </p>
-              <div className="mt-3 h-3 overflow-hidden rounded-full bg-primary/10">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width]"
-                  style={{ width: setupProgressWidth(completedSetupSteps, setupSteps.length) }}
-                />
+        <section className="space-y-3">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                  Kontrola sistema
+                </p>
+                <h2 className="mt-2 text-xl font-bold tracking-tight text-foreground">
+                  {hasHealthyStatusOnly
+                    ? "Sve kljucne stvari su pod kontrolom"
+                    : primaryAlerts.length === 1
+                      ? "Jedna stavka trazi paznju"
+                      : `${primaryAlerts.length} stavke traze paznju`}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Kratak pregled onoga sto moze da blokira ili uspori online zakazivanje.
+                </p>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                {bookingSetupReady
-                  ? "Klijenti mogu da zakazuju online, a admin moze i rucno da doda termin."
-                  : "Otvorite stavke ispod i dopunite ono sto jos nedostaje."}
-              </p>
+              <div className="min-w-[220px] rounded-2xl border border-primary/15 bg-primary/6 p-4">
+                <p className="text-sm font-semibold text-primary">
+                  Spremnost: {completedSetupSteps}/{setupSteps.length}
+                </p>
+                <div className="mt-3 h-3 overflow-hidden rounded-full bg-primary/10">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width]"
+                    style={{ width: setupProgressWidth(completedSetupSteps, setupSteps.length) }}
+                  />
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {bookingSetupReady
+                    ? "Osnovna postavka je spremna. Detalji ispod pomazu da sve ostane uredno."
+                    : "Dopuni kljucne stavke da bi javna strana sigurno nudila slobodne termine."}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-2">
-            {setupSteps.map((step, index) => (
-              <Link
-                key={step.key}
-                href={step.href}
-                className="rounded-xl border border-border/80 bg-background/95 p-4 transition hover:border-primary/30 hover:bg-background"
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className={
-                      step.done
-                        ? "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
-                        : "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground"
-                    }
+            {hasHealthyStatusOnly ? (
+              <div className="rounded-xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Online zakazivanje je spremno i trenutno nema kriticnih upozorenja.
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-3">
+                {primaryAlerts.map((alert) => (
+                  <Link
+                    key={alert.key}
+                    href={alert.href}
+                    className={`rounded-xl border px-4 py-3 transition hover:opacity-90 ${alertTone(alert.severity)}`}
                   >
-                    {step.done ? "OK" : index + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-foreground">{step.label}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {step.done ? "U redu" : "Nedostaje"}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold">{alert.title}</p>
+                        <p className="mt-1 text-sm opacity-90">{alert.description}</p>
+                      </div>
+                      <span className="rounded-full border border-current/20 px-2 py-0.5 text-[11px] font-semibold">
+                        {alertBadge(alert.severity)}
                       </span>
                     </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            <details className="rounded-xl border border-border/80 bg-background/95">
+              <summary className="cursor-pointer list-none px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      Detaljan status online zakazivanja
+                    </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {step.description}
+                      Pregled svih kontrolnih tacaka, odstupanja i precica za ispravku.
                     </p>
                   </div>
+                  <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground">
+                    {alerts.length} stavki
+                  </span>
                 </div>
-              </Link>
-            ))}
+              </summary>
+
+              <div className="border-t border-border px-4 py-4">
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {setupSteps.map((step, index) => (
+                    <Link
+                      key={step.key}
+                      href={step.href}
+                      className="rounded-xl border border-border/80 bg-card p-4 transition hover:border-primary/30 hover:bg-background"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={
+                            step.done
+                              ? "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                              : "inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground"
+                          }
+                        >
+                          {step.done ? "OK" : index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-foreground">{step.label}</p>
+                            <span className="text-xs text-muted-foreground">
+                              {step.done ? "U redu" : "Nedostaje"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {step.description}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                {(workersWithoutServices.length > 0 ||
+                  servicesWithoutWorkers.length > 0 ||
+                  invalidScheduleRows.length > 0) ? (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {workersWithoutServices.length > 0 ? (
+                      <Link
+                        href="/admin/radnici"
+                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
+                      >
+                        <p className="font-semibold">Radnici bez usluga</p>
+                        <p className="mt-1 text-sm">
+                          {workersWithoutServices.map((worker) => worker.name).join(", ")}
+                        </p>
+                      </Link>
+                    ) : null}
+                    {servicesWithoutWorkers.length > 0 ? (
+                      <Link
+                        href="/admin/usluge"
+                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
+                      >
+                        <p className="font-semibold">Aktivne usluge bez radnika</p>
+                        <p className="mt-1 text-sm">
+                          {servicesWithoutWorkers.length === 1
+                            ? "Jedna usluga nema dodeljenog radnika."
+                            : `${servicesWithoutWorkers.length} usluge nemaju dodeljene radnike.`}
+                        </p>
+                      </Link>
+                    ) : null}
+                    {invalidScheduleRows.length > 0 ? (
+                      <Link
+                        href="/admin/raspored"
+                        className="rounded-xl border border-amber-300/50 bg-amber-50 p-4 text-amber-800 transition hover:opacity-90"
+                      >
+                        <p className="font-semibold">Smene van radnog vremena</p>
+                        <p className="mt-1 text-sm">
+                          Proveri raspored i smene: postoji neslaganje sa radnim vremenom salona.
+                        </p>
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </details>
           </div>
         </section>
 
