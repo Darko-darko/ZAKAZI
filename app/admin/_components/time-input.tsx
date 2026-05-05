@@ -14,6 +14,11 @@ type TimeInputProps = {
   "aria-label"?: string;
 };
 
+type PartialTimeValue = {
+  hour: string;
+  minute: string;
+};
+
 const HOURS = Array.from({ length: 24 }, (_, hour) =>
   hour.toString().padStart(2, "0"),
 );
@@ -64,19 +69,34 @@ export function TimeInput({
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const isControlled = value !== undefined;
-  const [internalValue, setInternalValue] = useState(() =>
-    normalizeTimeValue(defaultValue),
+  const normalizedControlledValue = normalizeTimeValue(value ?? "");
+  const [internalParts, setInternalParts] = useState<PartialTimeValue>(() =>
+    splitTimeValue(defaultValue),
   );
-  const currentValue = isControlled
-    ? normalizeTimeValue(value ?? "")
-    : internalValue;
-  const { hour, minute } = splitTimeValue(currentValue);
+  const [draftParts, setDraftParts] = useState<PartialTimeValue | null>(null);
+  const controlledParts = splitTimeValue(normalizedControlledValue);
+  const currentParts = isControlled
+    ? draftParts ?? controlledParts
+    : internalParts;
+  const currentValue =
+    currentParts.hour && currentParts.minute
+      ? `${currentParts.hour}:${currentParts.minute}`
+      : "";
 
-  function updateValue(nextHour: string, nextMinute: string) {
-    const nextValue = nextHour && nextMinute ? `${nextHour}:${nextMinute}` : "";
-
+  function updateValue(nextParts: PartialTimeValue) {
     if (!isControlled) {
-      setInternalValue(nextValue);
+      setInternalParts(nextParts);
+    } else {
+      setDraftParts(nextParts);
+    }
+
+    const nextValue =
+      nextParts.hour && nextParts.minute
+        ? `${nextParts.hour}:${nextParts.minute}`
+        : "";
+
+    if (isControlled && nextValue) {
+      setDraftParts(null);
     }
 
     onValueChange?.(nextValue);
@@ -88,8 +108,13 @@ export function TimeInput({
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <select
           id={inputId}
-          value={hour}
-          onChange={(event) => updateValue(event.target.value, minute)}
+          value={currentParts.hour}
+          onChange={(event) =>
+            updateValue({
+              ...currentParts,
+              hour: event.target.value,
+            })
+          }
           required={required}
           disabled={disabled}
           aria-label={ariaLabel ? `${ariaLabel} sat` : undefined}
@@ -106,8 +131,13 @@ export function TimeInput({
         <span className="text-sm font-medium text-muted-foreground">:</span>
 
         <select
-          value={minute}
-          onChange={(event) => updateValue(hour, event.target.value)}
+          value={currentParts.minute}
+          onChange={(event) =>
+            updateValue({
+              ...currentParts,
+              minute: event.target.value,
+            })
+          }
           required={required}
           disabled={disabled}
           aria-label={ariaLabel ? `${ariaLabel} minut` : undefined}
