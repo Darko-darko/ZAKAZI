@@ -628,7 +628,7 @@ function buildClientReminderEmail(context: BookingEmailContext) {
       </div>
       ${cancellationBlock}
       <p style="margin-top: 24px; color: #64748b; font-size: 13px;">
-        Ovaj email je transakcioni podsetnik termina sa platforme zakazi.pro.
+        Ovo je automatski podsetnik za tvoj zakazani termin, poslat sa platforme zakazi.pro.
       </p>
     </div>
   `;
@@ -657,7 +657,7 @@ function buildClientReminderText(context: BookingEmailContext) {
   }
 
   lines.push("");
-  lines.push("Ovaj email je transakcioni podsetnik termina sa platforme zakazi.pro.");
+  lines.push("Ovo je automatski podsetnik za tvoj zakazani termin, poslat sa platforme zakazi.pro.");
 
   return lines.join("\n");
 }
