@@ -48,28 +48,58 @@ type DayHoursState = {
   isClosed: boolean;
 };
 
+function buildDayHoursState(hours: WorkingHour[]) {
+  const hoursByDay = new Map(hours.map((item) => [item.day_of_week, item]));
+
+  return Object.fromEntries(
+    weekDays.map(([dayIndex]) => {
+      const item = hoursByDay.get(dayIndex);
+
+      return [
+        dayIndex,
+        {
+          opensAt: item?.is_closed ? "" : trimTime(item?.opens_at ?? "09:00"),
+          closesAt: item?.is_closed ? "" : trimTime(item?.closes_at ?? "17:00"),
+          isClosed: item?.is_closed ?? false,
+        },
+      ];
+    }),
+  ) as Record<number, DayHoursState>;
+}
+
+function getInitialBulkHours(hours: WorkingHour[]) {
+  const hoursByDay = new Map(hours.map((item) => [item.day_of_week, item]));
+  const firstOpenDay = weekDays
+    .map(([dayIndex]) => hoursByDay.get(dayIndex))
+    .find((item) => item && !item.is_closed && item.opens_at && item.closes_at);
+
+  return {
+    opensAt: trimTime(firstOpenDay?.opens_at ?? "09:00"),
+    closesAt: trimTime(firstOpenDay?.closes_at ?? "17:00"),
+  };
+}
+
 export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
-  const hoursByDay = new Map(hours.map((item) => [item.day_of_week, item]));
-  const [bulkOpensAt, setBulkOpensAt] = useState("09:00");
-  const [bulkClosesAt, setBulkClosesAt] = useState("17:00");
-  const [dayHours, setDayHours] = useState<Record<number, DayHoursState>>(
-    () =>
-      Object.fromEntries(
-        weekDays.map(([dayIndex]) => {
-          const item = hoursByDay.get(dayIndex);
-
-          return [
-            dayIndex,
-            {
-              opensAt: trimTime(item?.opens_at ?? "09:00"),
-              closesAt: trimTime(item?.closes_at ?? "17:00"),
-              isClosed: item?.is_closed ?? false,
-            },
-          ];
-        }),
-      ) as Record<number, DayHoursState>,
+  const [bulkOpensAt, setBulkOpensAt] = useState(
+    () => getInitialBulkHours(hours).opensAt,
   );
+  const [bulkClosesAt, setBulkClosesAt] = useState(
+    () => getInitialBulkHours(hours).closesAt,
+  );
+  const [dayHours, setDayHours] = useState<Record<number, DayHoursState>>(
+    () => buildDayHoursState(hours),
+  );
+
+  function rememberBulkTime(opensAt: string, closesAt: string) {
+    if (opensAt) {
+      setBulkOpensAt(opensAt);
+    }
+
+    if (closesAt) {
+      setBulkClosesAt(closesAt);
+    }
+  }
 
   function applyBulkToDays(days: number[]) {
     setDayHours((current) => {
@@ -115,6 +145,7 @@ export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
             </label>
             <TimeInput
               id="bulk_opens"
+              name="bulk_opens"
               value={bulkOpensAt}
               onValueChange={setBulkOpensAt}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
@@ -130,6 +161,7 @@ export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
             </label>
             <TimeInput
               id="bulk_closes"
+              name="bulk_closes"
               value={bulkClosesAt}
               onValueChange={setBulkClosesAt}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
@@ -178,78 +210,92 @@ export function WorkingHoursForm({ action, hours }: WorkingHoursFormProps) {
                     type="checkbox"
                     name={`closed_${dayIndex}`}
                     checked={item?.isClosed ?? false}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const isClosed = event.target.checked;
+                      const opensAt = isClosed
+                        ? ""
+                        : item?.opensAt || bulkOpensAt || "09:00";
+                      const closesAt = isClosed
+                        ? ""
+                        : item?.closesAt || bulkClosesAt || "17:00";
+
+                      if (!isClosed) {
+                        rememberBulkTime(opensAt, closesAt);
+                      }
+
                       setDayHours((current) => ({
                         ...current,
                         [dayIndex]: {
                           ...current[dayIndex],
-                          isClosed: event.target.checked,
-                          opensAt: event.target.checked
-                            ? ""
-                            : current[dayIndex].opensAt || "09:00",
-                          closesAt: event.target.checked
-                            ? ""
-                            : current[dayIndex].closesAt || "17:00",
+                          isClosed,
+                          opensAt,
+                          closesAt,
                         },
-                      }))
-                    }
+                      }));
+                    }}
                     className="size-4 accent-primary"
                   />
                   Ne radi
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2 rounded-md border border-border bg-background p-3">
-                  <label
-                    htmlFor={`opens_${dayIndex}`}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Otvara
-                  </label>
-                  <TimeInput
-                    id={`opens_${dayIndex}`}
-                    name={`opens_${dayIndex}`}
-                    value={item?.opensAt ?? ""}
-                    onValueChange={(nextValue) =>
-                      setDayHours((current) => ({
-                        ...current,
-                        [dayIndex]: {
-                          ...current[dayIndex],
-                          opensAt: nextValue,
-                        },
-                      }))
-                    }
-                    disabled={item?.isClosed}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-50 focus:border-ring focus:ring-2 focus:ring-ring/20"
-                  />
+              {item?.isClosed ? (
+                <div className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Ovaj dan je zatvoren i termini se ne nude.
                 </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 rounded-md border border-border bg-background p-3">
+                    <label
+                      htmlFor={`opens_${dayIndex}`}
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Otvara
+                    </label>
+                    <TimeInput
+                      id={`opens_${dayIndex}`}
+                      name={`opens_${dayIndex}`}
+                      value={item?.opensAt ?? ""}
+                      onValueChange={(nextValue) => {
+                        rememberBulkTime(nextValue, item?.closesAt ?? "");
+                        setDayHours((current) => ({
+                          ...current,
+                          [dayIndex]: {
+                            ...current[dayIndex],
+                            opensAt: nextValue,
+                          },
+                        }));
+                      }}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </div>
 
-                <div className="space-y-2 rounded-md border border-border bg-background p-3">
-                  <label
-                    htmlFor={`closes_${dayIndex}`}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Zatvara
-                  </label>
-                  <TimeInput
-                    id={`closes_${dayIndex}`}
-                    name={`closes_${dayIndex}`}
-                    value={item?.closesAt ?? ""}
-                    onValueChange={(nextValue) =>
-                      setDayHours((current) => ({
-                        ...current,
-                        [dayIndex]: {
-                          ...current[dayIndex],
-                          closesAt: nextValue,
-                        },
-                      }))
-                    }
-                    disabled={item?.isClosed}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-50 focus:border-ring focus:ring-2 focus:ring-ring/20"
-                  />
+                  <div className="space-y-2 rounded-md border border-border bg-background p-3">
+                    <label
+                      htmlFor={`closes_${dayIndex}`}
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Zatvara
+                    </label>
+                    <TimeInput
+                      id={`closes_${dayIndex}`}
+                      name={`closes_${dayIndex}`}
+                      value={item?.closesAt ?? ""}
+                      onValueChange={(nextValue) => {
+                        rememberBulkTime(item?.opensAt ?? "", nextValue);
+                        setDayHours((current) => ({
+                          ...current,
+                          [dayIndex]: {
+                            ...current[dayIndex],
+                            closesAt: nextValue,
+                          },
+                        }));
+                      }}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
           );
         })}
