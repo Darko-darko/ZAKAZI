@@ -1009,19 +1009,12 @@ async function listDueReminderContexts() {
 
 async function claimBookingReminderLog(context: BookingEmailContext) {
   const admin = createAdminClient();
-  const rpc = admin.rpc as unknown as <T>(
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: T | null; error: { message: string } | null }>;
-  const { data, error } = await rpc<string>(
-    "claim_booking_reminder_email_log",
-    {
-      p_booking_id: context.id,
-      p_provider_id: context.providerId,
-      p_recipient_email: context.clientEmail,
-      p_subject: buildClientReminderSubject(context),
-    },
-  );
+  const { data, error } = await admin.rpc("claim_booking_reminder_email_log", {
+    p_booking_id: context.id,
+    p_provider_id: context.providerId,
+    p_recipient_email: context.clientEmail,
+    p_subject: buildClientReminderSubject(context),
+  });
 
   if (error) {
     throw new Error(
