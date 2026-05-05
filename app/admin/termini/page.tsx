@@ -455,6 +455,8 @@ export default async function AdminBookingsPage({
 
     return [dayName];
   });
+  const hasCompleteWorkerSchedule =
+    hasWorkerSchedule && openDaysWithoutWorkers.length === 0;
   const setupSteps: SetupStep[] = [
     {
       key: "services",
@@ -487,9 +489,14 @@ export default async function AdminBookingsPage({
     {
       key: "worker_schedule",
       label: "Raspored radnika",
-      description: "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
+      description:
+        openDaysWithoutWorkers.length > 0
+          ? openDaysWithoutWorkers.length === 1
+            ? `Dodaj radnika za ${openDaysWithoutWorkers[0]} ili zatvori taj dan u radnom vremenu.`
+            : `Dodaj radnike za otvorene dane bez pokrica: ${openDaysWithoutWorkers.join(", ")}.`
+          : "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
       href: "/admin/raspored",
-      done: hasWorkerSchedule,
+      done: hasCompleteWorkerSchedule,
     },
   ];
   const completedSetupSteps = setupSteps.filter((step) => step.done).length;
@@ -541,19 +548,6 @@ export default async function AdminBookingsPage({
         invalidScheduleRows.length === 1
           ? "Jedna smena ili raspored je van otvorenog radnog vremena."
           : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
-      href: "/admin/raspored",
-      severity: "warning",
-    });
-  }
-
-  if (openDaysWithoutWorkers.length > 0) {
-    alerts.push({
-      key: "open_days_without_workers",
-      title: "Otvoreni dani bez radnika",
-      description:
-        openDaysWithoutWorkers.length === 1
-          ? `Radno vreme je otvoreno za ${openDaysWithoutWorkers[0]}, ali nijedan radnik ne radi.`
-          : `Radno vreme je otvoreno za ${openDaysWithoutWorkers.length} dana bez ijednog radnika.`,
       href: "/admin/raspored",
       severity: "warning",
     });
