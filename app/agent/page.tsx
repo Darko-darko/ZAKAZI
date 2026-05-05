@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ReferralLinkActions } from "@/app/_components/referral-link-actions";
 import { logoutAction } from "@/app/auth/actions";
@@ -5,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RegisterProviderForm } from "./register-form";
 
 export const metadata = {
-  title: "Agent | zakazi.pro",
+  title: "Partner | zakazi.pro",
 };
 
 const PLAN_STATUS_LABEL: Record<string, string> = {
@@ -39,6 +40,28 @@ function formatMoney(amount: number | null) {
   }
   return new Intl.NumberFormat("sr-RS").format(amount) + " RSD";
 }
+
+function formatMonth(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    timeZone: "Europe/Belgrade",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, monthIndex - 1, 1)));
+}
+
+type MonthlyCommissionSummary = {
+  key: string;
+  month: string;
+  total: number;
+  pending: number;
+  approved: number;
+  paid: number;
+  count: number;
+  approvedAt: string | null;
+  paidAt: string | null;
+};
 
 export default async function AgentPage() {
   const supabase = await createClient();
@@ -82,13 +105,61 @@ export default async function AgentPage() {
     .filter((c) => c.status !== "paid")
     .reduce((sum, c) => sum + (c.amount ?? 0), 0);
 
+  const monthlyCommissionsByKey = new Map<string, MonthlyCommissionSummary>();
+
+  for (const commission of commissions ?? []) {
+    const month = commission.created_at.slice(0, 7);
+    const current =
+      monthlyCommissionsByKey.get(month) ??
+      ({
+        key: month,
+        month,
+        total: 0,
+        pending: 0,
+        approved: 0,
+        paid: 0,
+        count: 0,
+        approvedAt: null,
+        paidAt: null,
+      } satisfies MonthlyCommissionSummary);
+
+    const amount = commission.amount ?? 0;
+    current.total += amount;
+    current.count += 1;
+
+    if (commission.status === "paid") {
+      current.paid += amount;
+    } else if (commission.status === "approved") {
+      current.approved += amount;
+    } else {
+      current.pending += amount;
+    }
+
+    if (
+      commission.approved_at &&
+      (!current.approvedAt || commission.approved_at > current.approvedAt)
+    ) {
+      current.approvedAt = commission.approved_at;
+    }
+
+    if (commission.paid_at && (!current.paidAt || commission.paid_at > current.paidAt)) {
+      current.paidAt = commission.paid_at;
+    }
+
+    monthlyCommissionsByKey.set(month, current);
+  }
+
+  const monthlyCommissions = Array.from(monthlyCommissionsByKey.values()).sort(
+    (a, b) => b.month.localeCompare(a.month),
+  );
+
   return (
     <main className="flex flex-1 px-4 py-8 sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-5xl space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Agent panel
+              Partner panel
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {agent.name}
@@ -97,16 +168,24 @@ export default async function AgentPage() {
               Provizija po default-u: {agent.default_commission_percent}%
             </p>
           </div>
-          <form action={logoutAction}>
-            <button className="btn-secondary rounded-md px-4 py-2 text-sm font-medium text-foreground">
-              Odjavi se
-            </button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin"
+              className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground"
+            >
+              Admin panel
+            </Link>
+            <form action={logoutAction}>
+              <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground">
+                Odjavi se
+              </button>
+            </form>
+          </div>
         </header>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-md border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Mojih salona</p>
+            <p className="text-sm text-muted-foreground">Mojih klijenata</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
               {providers?.length ?? 0}
             </p>
@@ -151,7 +230,7 @@ export default async function AgentPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-foreground">Moji saloni</h2>
+          <h2 className="text-xl font-semibold text-foreground">Moji klijenti</h2>
           {providers && providers.length > 0 ? (
             <div className="divide-y divide-border rounded-md border border-border bg-card">
               {providers.map((provider) => (
@@ -182,7 +261,71 @@ export default async function AgentPage() {
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Još nemaš registrovanih salona. Registruj prvi gore.
+              Jos nemas registrovanih klijenata. Registruj prvi gore.
+            </p>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              Mesecni obracun
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Ovde vidis kada je provizija obracunata, odobrena i potvrdjena kao
+              isplacena.
+            </p>
+          </div>
+          {monthlyCommissions.length ? (
+            <div className="grid gap-3">
+              {monthlyCommissions.map((summary) => (
+                <article
+                  key={summary.key}
+                  className="rounded-md border border-border bg-card p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                        {formatMonth(summary.month)}
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-foreground">
+                        {formatMoney(summary.total)}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {summary.count} stavki provizije
+                      </p>
+                    </div>
+                    <div className="grid gap-2 text-sm sm:min-w-[24rem] sm:grid-cols-3">
+                      <div className="rounded-md border border-border bg-background px-3 py-2">
+                        <p className="text-xs text-muted-foreground">Ceka</p>
+                        <p className="font-semibold text-foreground">
+                          {formatMoney(summary.pending)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background px-3 py-2">
+                        <p className="text-xs text-muted-foreground">Odobreno</p>
+                        <p className="font-semibold text-foreground">
+                          {formatMoney(summary.approved)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background px-3 py-2">
+                        <p className="text-xs text-muted-foreground">Isplaceno</p>
+                        <p className="font-semibold text-foreground">
+                          {formatMoney(summary.paid)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    Odobreno: {formatDate(summary.approvedAt)} · Isplaceno:{" "}
+                    {formatDate(summary.paidAt)}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Jos nema mesecnih obracuna.
             </p>
           )}
         </section>

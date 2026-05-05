@@ -4,6 +4,8 @@ import { logoutAction } from "@/app/auth/actions";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
 import { NewAgentForm } from "./new-agent-form";
 import {
+  approveMonthlyCommissionsAction,
+  markMonthlyCommissionsPaidAction,
   toggleAgentActiveAction,
   updateAgentCommissionAction,
 } from "./actions";
@@ -15,6 +17,43 @@ export const metadata = {
 function formatMoney(amount: number) {
   return new Intl.NumberFormat("sr-RS").format(amount) + " RSD";
 }
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "nije potvrdjeno";
+  }
+
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    timeZone: "Europe/Belgrade",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatMonth(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
+    timeZone: "Europe/Belgrade",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, monthIndex - 1, 1)));
+}
+
+type MonthlyCommissionSummary = {
+  key: string;
+  agentId: string;
+  agentName: string;
+  month: string;
+  total: number;
+  pending: number;
+  approved: number;
+  paid: number;
+  count: number;
+  approvedAt: string | null;
+  paidAt: string | null;
+};
 
 export default async function SuperAdminAgentsPage() {
   const { admin } = await requireSuperAdmin();
@@ -28,7 +67,9 @@ export default async function SuperAdminAgentsPage() {
         )
         .order("created_at", { ascending: false }),
       admin.from("providers").select("id, agent_id"),
-      admin.from("agent_commissions").select("agent_id, amount, status"),
+      admin
+        .from("agent_commissions")
+        .select("agent_id, amount, status, created_at, approved_at, paid_at"),
     ]);
 
   const providerCountByAgent = new Map<string, number>();
@@ -53,6 +94,59 @@ export default async function SuperAdminAgentsPage() {
     );
   }
 
+  const agentNameById = new Map((agents ?? []).map((agent) => [agent.id, agent.name]));
+  const monthlyCommissionsByKey = new Map<string, MonthlyCommissionSummary>();
+
+  for (const commission of commissions ?? []) {
+    const month = commission.created_at.slice(0, 7);
+    const key = `${commission.agent_id}:${month}`;
+    const current =
+      monthlyCommissionsByKey.get(key) ??
+      ({
+        key,
+        agentId: commission.agent_id,
+        agentName: agentNameById.get(commission.agent_id) ?? "Agent",
+        month,
+        total: 0,
+        pending: 0,
+        approved: 0,
+        paid: 0,
+        count: 0,
+        approvedAt: null,
+        paidAt: null,
+      } satisfies MonthlyCommissionSummary);
+
+    const amount = commission.amount ?? 0;
+    current.total += amount;
+    current.count += 1;
+
+    if (commission.status === "paid") {
+      current.paid += amount;
+    } else if (commission.status === "approved") {
+      current.approved += amount;
+    } else {
+      current.pending += amount;
+    }
+
+    if (
+      commission.approved_at &&
+      (!current.approvedAt || commission.approved_at > current.approvedAt)
+    ) {
+      current.approvedAt = commission.approved_at;
+    }
+
+    if (commission.paid_at && (!current.paidAt || commission.paid_at > current.paidAt)) {
+      current.paidAt = commission.paid_at;
+    }
+
+    monthlyCommissionsByKey.set(key, current);
+  }
+
+  const monthlyCommissions = Array.from(monthlyCommissionsByKey.values()).sort(
+    (a, b) =>
+      b.month.localeCompare(a.month) || a.agentName.localeCompare(b.agentName),
+  );
+
   return (
     <main className="flex flex-1 px-4 py-8 sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-6xl space-y-8">
@@ -71,11 +165,19 @@ export default async function SuperAdminAgentsPage() {
               Kreiraj nove agente, podesi provizije, deaktiviraj naloge.
             </p>
           </div>
-          <form action={logoutAction}>
-            <button className="btn-secondary rounded-md px-4 py-2 text-sm font-medium text-foreground">
-              Odjavi se
-            </button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin"
+              className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground"
+            >
+              Admin panel
+            </Link>
+            <form action={logoutAction}>
+              <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground">
+                Odjavi se
+              </button>
+            </form>
+          </div>
         </header>
 
         <section className="rounded-md border border-border bg-card p-6">
@@ -90,12 +192,133 @@ export default async function SuperAdminAgentsPage() {
         </section>
 
         <section className="space-y-3">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              Mesecni obracun provizija
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Provizije se automatski pojavljuju ovde kada je faktura salona
+              potvrdjena kao placena.
+            </p>
+          </div>
+
+          {monthlyCommissions.length ? (
+            <div className="grid gap-3">
+              {monthlyCommissions.map((summary) => {
+                const openAmount = summary.pending + summary.approved;
+
+                return (
+                  <article
+                    key={summary.key}
+                    className="rounded-md border border-border bg-card p-4"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                          {formatMonth(summary.month)}
+                        </p>
+                        <h3 className="mt-1 text-lg font-semibold text-foreground">
+                          {summary.agentName}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {summary.count} stavki provizije
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[36rem]">
+                        <div className="rounded-md border border-border bg-background px-3 py-2">
+                          <p className="text-xs text-muted-foreground">Ukupno</p>
+                          <p className="font-semibold text-foreground">
+                            {formatMoney(summary.total)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-border bg-background px-3 py-2">
+                          <p className="text-xs text-muted-foreground">Ceka</p>
+                          <p className="font-semibold text-foreground">
+                            {formatMoney(summary.pending)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-border bg-background px-3 py-2">
+                          <p className="text-xs text-muted-foreground">Odobreno</p>
+                          <p className="font-semibold text-foreground">
+                            {formatMoney(summary.approved)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-border bg-background px-3 py-2">
+                          <p className="text-xs text-muted-foreground">Isplaceno</p>
+                          <p className="font-semibold text-foreground">
+                            {formatMoney(summary.paid)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        <span>Odobreno: {formatDate(summary.approvedAt)}</span>
+                        <span className="mx-2">·</span>
+                        <span>Isplaceno: {formatDate(summary.paidAt)}</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {summary.pending > 0 ? (
+                          <form action={approveMonthlyCommissionsAction}>
+                            <input
+                              type="hidden"
+                              name="agent_id"
+                              value={summary.agentId}
+                            />
+                            <input
+                              type="hidden"
+                              name="month"
+                              value={summary.month}
+                            />
+                            <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-3 text-sm font-semibold text-foreground">
+                              Odobri obracun
+                            </button>
+                          </form>
+                        ) : null}
+                        {openAmount > 0 ? (
+                          <form action={markMonthlyCommissionsPaidAction}>
+                            <input
+                              type="hidden"
+                              name="agent_id"
+                              value={summary.agentId}
+                            />
+                            <input
+                              type="hidden"
+                              name="month"
+                              value={summary.month}
+                            />
+                            <button className="btn-primary inline-flex min-h-10 items-center justify-center rounded-md px-3 text-sm font-semibold text-primary-foreground">
+                              Oznaci isplaceno ({formatMoney(openAmount)})
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="inline-flex min-h-10 items-center rounded-md border border-brand/30 bg-brand-soft px-3 text-sm font-semibold text-brand">
+                            Isplaceno
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Jos nema provizija za mesecni obracun.
+            </p>
+          )}
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-xl font-semibold text-foreground">
             Svi agenti ({agents?.length ?? 0})
           </h2>
           {agents && agents.length > 0 ? (
-            <div className="overflow-hidden rounded-md border border-border bg-card">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-md border border-border bg-card [touch-action:pan-x]">
+              <table className="min-w-[980px] w-full text-sm">
                 <thead className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Agent</th>

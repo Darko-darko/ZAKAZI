@@ -228,11 +228,19 @@ export default async function SuperAdminPage({
               Pregled salona, faktura i potvrda uplata na jednom mestu.
             </p>
           </div>
-          <form action={logoutAction}>
-            <button className="btn-secondary rounded-md px-4 py-2 text-sm font-medium text-foreground">
-              Odjavi se
-            </button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin"
+              className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground"
+            >
+              Admin panel
+            </Link>
+            <form action={logoutAction}>
+              <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-foreground">
+                Odjavi se
+              </button>
+            </form>
+          </div>
         </header>
 
         {notice === "platform-saved" ? (

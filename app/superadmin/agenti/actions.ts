@@ -207,3 +207,78 @@ export async function toggleAgentActiveAction(formData: FormData) {
 
   revalidatePath("/superadmin/agenti");
 }
+
+function monthBounds(monthKey: string) {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    return null;
+  }
+
+  const [year, month] = monthKey.split("-").map(Number);
+  const from = new Date(Date.UTC(year, month - 1, 1));
+  const to = new Date(Date.UTC(year, month, 1));
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return null;
+  }
+
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+  };
+}
+
+export async function approveMonthlyCommissionsAction(formData: FormData) {
+  const { admin } = await requireSuperAdmin();
+
+  const agentId = readString(formData, "agent_id");
+  const monthKey = readString(formData, "month");
+  const bounds = monthBounds(monthKey);
+
+  if (!agentId || !bounds) {
+    return;
+  }
+
+  await admin
+    .from("agent_commissions")
+    .update({
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    })
+    .eq("agent_id", agentId)
+    .eq("status", "pending")
+    .gte("created_at", bounds.from)
+    .lt("created_at", bounds.to);
+
+  revalidatePath("/superadmin");
+  revalidatePath("/superadmin/agenti");
+  revalidatePath("/agent");
+}
+
+export async function markMonthlyCommissionsPaidAction(formData: FormData) {
+  const { admin } = await requireSuperAdmin();
+
+  const agentId = readString(formData, "agent_id");
+  const monthKey = readString(formData, "month");
+  const bounds = monthBounds(monthKey);
+  const paidAt = new Date().toISOString();
+
+  if (!agentId || !bounds) {
+    return;
+  }
+
+  await admin
+    .from("agent_commissions")
+    .update({
+      status: "paid",
+      approved_at: paidAt,
+      paid_at: paidAt,
+    })
+    .eq("agent_id", agentId)
+    .in("status", ["pending", "approved"])
+    .gte("created_at", bounds.from)
+    .lt("created_at", bounds.to);
+
+  revalidatePath("/superadmin");
+  revalidatePath("/superadmin/agenti");
+  revalidatePath("/agent");
+}

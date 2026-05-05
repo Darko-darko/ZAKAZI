@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/auth/actions";
 import { ManualBookingFilters } from "@/app/admin/_components/manual-booking-filters";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { isSuperAdminEmail } from "@/lib/auth/roles";
 import {
   createManualBookingAction,
   resendBookingConfirmationAction,
@@ -265,7 +266,14 @@ export default async function AdminBookingsPage({
   searchParams,
 }: AdminBookingsPageProps) {
   const query = await searchParams;
-  const { supabase, provider } = await getCurrentProvider();
+  const { supabase, provider, user } = await getCurrentProvider();
+  const isSuperAdmin = isSuperAdminEmail(user.email);
+  const { data: currentAgent } = await supabase
+    .from("agents")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const isAgent = Boolean(currentAgent);
   const today = todayInBelgrade();
   const tomorrow = shiftDate(today, 1);
   const selectedDate = firstParam(query.date) ?? today;
@@ -569,11 +577,29 @@ export default async function AdminBookingsPage({
                 Pregled ko je zakazao, kada, kod koga i za koju uslugu.
               </p>
             </div>
-            <form action={logoutAction} className="self-start">
-              <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground">
-                Odjavi se
-              </button>
-            </form>
+            <div className="flex flex-wrap gap-2 self-start">
+              {isSuperAdmin ? (
+                <Link
+                  href="/superadmin"
+                  className="btn-primary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-primary-foreground"
+                >
+                  Superadmin panel
+                </Link>
+              ) : null}
+              {isAgent ? (
+                <Link
+                  href="/agent"
+                  className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
+                >
+                  Partner panel
+                </Link>
+              ) : null}
+              <form action={logoutAction}>
+                <button className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground">
+                  Odjavi se
+                </button>
+              </form>
+            </div>
           </div>
         </header>
 
