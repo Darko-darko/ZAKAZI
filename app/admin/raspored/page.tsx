@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 import { updateScheduleMatrixAction } from "./actions";
 import { ScheduleMatrixForm } from "./schedule-matrix-form";
 
@@ -20,6 +21,12 @@ type WorkingHourRow = {
   opens_at: string | null;
   closes_at: string | null;
   is_closed: boolean;
+};
+
+type ShiftRow = {
+  id: string;
+  start_time: string;
+  end_time: string;
 };
 
 const weekDays = [
@@ -68,6 +75,14 @@ export default async function SchedulePage() {
     ]);
   const scheduleRows = (schedules ?? []) as ScheduleRow[];
   const workingHourRows = (workingHours ?? []) as WorkingHourRow[];
+  const shiftRows = (shifts ?? []) as ShiftRow[];
+  const shiftsById = new Map(shiftRows.map((shift) => [shift.id, shift]));
+  const workingHoursByDay = new Map(
+    workingHourRows.map((row) => [row.day_of_week, row]),
+  );
+  const hasAnySchedule = scheduleRows.some(
+    (schedule) => schedule.shift_id || schedule.custom_start_time,
+  );
   const daysWithWorkers = new Set(
     scheduleRows
       .filter((schedule) => schedule.shift_id || schedule.custom_start_time)
@@ -96,6 +111,22 @@ export default async function SchedulePage() {
       };
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const invalidScheduleRows = scheduleRows.filter((row) => {
+    const day = workingHoursByDay.get(row.day_of_week);
+    const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
+
+    if (!day || day.is_closed) {
+      return Boolean(shift);
+    }
+
+    if (!shift || !day.opens_at || !day.closes_at) {
+      return false;
+    }
+
+    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+  });
+  const showNoScheduleAlert =
+    !hasAnySchedule && (workers ?? []).length > 0 && workingHourRows.some((row) => !row.is_closed);
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -129,13 +160,18 @@ export default async function SchedulePage() {
           </div>
         </header>
 
+        {showNoScheduleAlert ? (
+          <AdminAlertBox
+            title="Nijedan radnik nema raspored."
+            description="Da bi se pojavili slobodni termini, dodaj smenu ili custom vreme bar jednom radniku za otvorene dane."
+          />
+        ) : null}
+
         {openDaysWithoutWorkers.length ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <p className="font-semibold">Neki otvoreni dani nemaju radnike.</p>
-            <p className="mt-1">
-              Klijenti nece moci da zakazu termin za te dane dok bar jednom
-              radniku ne dodelis smenu ili custom vreme.
-            </p>
+          <AdminAlertBox
+            title="Neki otvoreni dani nemaju radnike."
+            description="Klijenti nece moci da zakazu termin za te dane dok bar jednom radniku ne dodelis smenu ili custom vreme."
+          >
             <ul className="mt-3 list-disc space-y-1 pl-5">
               {openDaysWithoutWorkers.map((day) => (
                 <li key={day.dayName}>
@@ -144,7 +180,18 @@ export default async function SchedulePage() {
                 </li>
               ))}
             </ul>
-          </div>
+          </AdminAlertBox>
+        ) : null}
+
+        {invalidScheduleRows.length ? (
+          <AdminAlertBox
+            title="Smene van radnog vremena."
+            description={
+              invalidScheduleRows.length === 1
+                ? "Jedna smena ili raspored je van otvorenog radnog vremena salona — slobodni termini se nece prikazati ispravno."
+                : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena salona — slobodni termini se nece prikazati ispravno.`
+            }
+          />
         ) : null}
 
         <ScheduleMatrixForm

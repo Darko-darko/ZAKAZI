@@ -106,7 +106,7 @@ const ADMIN_LINKS = [
   ["/admin/smene", "Smene"],
   ["/admin/raspored", "Raspored"],
   ["/admin/naplata", "Naplata"],
-  ["/admin/sajt", "Vasa stranica"],
+  ["/admin/sajt", "Vaša stranica"],
 ] as const;
 
 const BOOKINGS_OVERVIEW_ID = "dnevni-pregled";

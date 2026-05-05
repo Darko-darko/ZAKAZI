@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 import {
   createNonWorkingDayAction,
   deleteNonWorkingDayAction,
@@ -66,6 +67,13 @@ export default async function WorkingHoursPage() {
             Raspored radnika
           </Link>
         </header>
+
+        {hours?.length && hours.every((row) => row.is_closed) ? (
+          <AdminAlertBox
+            title="Nijedan dan nije otvoren"
+            description="Otvori bar jedan dan u nedelji da bi klijenti mogli da zakazuju online termine."
+          />
+        ) : null}
 
         <div className="rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
           Unesi dane i vreme kada si dostupan za zakazivanje.

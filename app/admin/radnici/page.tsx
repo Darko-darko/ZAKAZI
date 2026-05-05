@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 
 export const metadata = {
   title: "Radnici | zakazi.pro",
@@ -48,7 +49,26 @@ export default async function WorkersPage({ searchParams }: WorkersPageProps) {
     query = query.not("archived_at", "is", null);
   }
 
-  const { data: workers } = await query;
+  const [{ data: workers }, { data: activeWorkers }, { data: workerServices }] =
+    await Promise.all([
+      query,
+      supabase
+        .from("workers")
+        .select("id, name")
+        .eq("provider_id", provider.id)
+        .is("archived_at", null),
+      supabase.from("worker_services").select("worker_id"),
+    ]);
+
+  const activeWorkerIds = new Set((activeWorkers ?? []).map((worker) => worker.id));
+  const workersWithServices = new Set(
+    (workerServices ?? [])
+      .filter((row) => activeWorkerIds.has(row.worker_id))
+      .map((row) => row.worker_id),
+  );
+  const workersWithoutServices = (activeWorkers ?? []).filter(
+    (worker) => !workersWithServices.has(worker.id),
+  );
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -73,6 +93,17 @@ export default async function WorkersPage({ searchParams }: WorkersPageProps) {
             Dodaj radnika
           </Link>
         </header>
+
+        {workersWithoutServices.length ? (
+          <AdminAlertBox
+            title="Radnici bez usluga"
+            description={
+              workersWithoutServices.length === 1
+                ? `${workersWithoutServices[0].name} nema dodeljene usluge — klijent ga ne moze zakazati.`
+                : `${workersWithoutServices.length} radnika nemaju dodeljene usluge: ${workersWithoutServices.map((worker) => worker.name).join(", ")}.`
+            }
+          />
+        ) : null}
 
         <nav className="flex flex-wrap gap-2">
           <Link

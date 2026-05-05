@@ -2,9 +2,27 @@ import Link from "next/link";
 import { SiteEditor } from "./site-editor";
 import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
+
+const READINESS_WEEK_DAYS = [
+  [1, "ponedeljak"],
+  [2, "utorak"],
+  [3, "sredu"],
+  [4, "cetvrtak"],
+  [5, "petak"],
+  [6, "subotu"],
+  [0, "nedelju"],
+] as const;
+
+type ReadinessAlert = {
+  key: string;
+  title: string;
+  description: string;
+  href: string;
+};
 
 export const metadata = {
-  title: "Vasa stranica | zakazi.pro",
+  title: "Vaša stranica | zakazi.pro",
 };
 
 export default async function AdminSitePage() {
@@ -52,7 +70,16 @@ export default async function AdminSitePage() {
     throw new Error("Stranica nije pronadjena.");
   }
 
-  const [{ data: services }, { data: workers }] = await Promise.all([
+  const [
+    { data: services },
+    { data: workers },
+    { data: readinessWorkers },
+    { data: readinessServices },
+    { data: readinessWorkerServices },
+    { data: readinessWorkingHours },
+    { data: readinessWorkerSchedules },
+    { data: readinessShifts },
+  ] = await Promise.all([
     supabase
       .from("services")
       .select("id, name, duration_minutes, price, sort_order")
@@ -68,7 +95,218 @@ export default async function AdminSitePage() {
       .is("archived_at", null)
       .order("created_at", { ascending: true })
       .order("name", { ascending: true }),
+    supabase
+      .from("workers")
+      .select("id, name")
+      .eq("provider_id", currentProvider.id)
+      .is("archived_at", null),
+    supabase
+      .from("services")
+      .select("id, name, is_active")
+      .eq("provider_id", currentProvider.id),
+    supabase.from("worker_services").select("worker_id, service_id"),
+    supabase
+      .from("provider_working_hours")
+      .select("day_of_week, opens_at, closes_at, is_closed")
+      .eq("provider_id", currentProvider.id),
+    supabase
+      .from("worker_schedule")
+      .select("worker_id, day_of_week, shift_id, custom_start_time"),
+    supabase
+      .from("shifts")
+      .select("id, start_time, end_time")
+      .eq("provider_id", currentProvider.id),
   ]);
+
+  const allWorkers = readinessWorkers ?? [];
+  const allServices = readinessServices ?? [];
+  const allWorkerServices = readinessWorkerServices ?? [];
+  const allWorkingHours = readinessWorkingHours ?? [];
+  const allWorkerSchedules = readinessWorkerSchedules ?? [];
+  const allShifts = readinessShifts ?? [];
+
+  const workerIds = new Set(allWorkers.map((worker) => worker.id));
+  const activeServiceIds = new Set(
+    allServices.filter((service) => service.is_active).map((service) => service.id),
+  );
+  const hasWorkerServiceAssignments = allWorkerServices.some(
+    (assignment) =>
+      workerIds.has(assignment.worker_id) &&
+      activeServiceIds.has(assignment.service_id),
+  );
+  const hasOpenWorkingHours = allWorkingHours.some((row) => row.is_closed === false);
+  const hasWorkerSchedule = allWorkerSchedules.some((row) =>
+    workerIds.has(row.worker_id),
+  );
+  const workingHoursByDay = new Map(
+    allWorkingHours.map((row) => [row.day_of_week, row]),
+  );
+  const shiftsById = new Map(allShifts.map((shift) => [shift.id, shift]));
+  const serviceAssignmentsByWorker = new Map<string, number>();
+
+  for (const assignment of allWorkerServices) {
+    serviceAssignmentsByWorker.set(
+      assignment.worker_id,
+      (serviceAssignmentsByWorker.get(assignment.worker_id) ?? 0) + 1,
+    );
+  }
+
+  const workersWithoutServices = allWorkers.filter(
+    (worker) => (serviceAssignmentsByWorker.get(worker.id) ?? 0) === 0,
+  );
+  const servicesWithoutWorkers = allServices.filter((service) => {
+    if (!service.is_active) {
+      return false;
+    }
+
+    return !allWorkerServices.some(
+      (assignment) =>
+        assignment.service_id === service.id &&
+        workerIds.has(assignment.worker_id),
+    );
+  });
+  const invalidScheduleRows = allWorkerSchedules.filter((row) => {
+    const day = workingHoursByDay.get(row.day_of_week);
+    const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
+
+    if (!day || day.is_closed) {
+      return Boolean(shift);
+    }
+
+    if (!shift || !day.opens_at || !day.closes_at) {
+      return false;
+    }
+
+    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+  });
+  const daysWithWorkers = new Set(
+    allWorkerSchedules
+      .filter(
+        (row) =>
+          workerIds.has(row.worker_id) && (row.shift_id || row.custom_start_time),
+      )
+      .map((row) => row.day_of_week),
+  );
+  const openDaysWithoutWorkers = READINESS_WEEK_DAYS.flatMap(
+    ([dayIndex, dayName]) => {
+      const day = workingHoursByDay.get(dayIndex);
+
+      if (
+        !day ||
+        day.is_closed ||
+        !day.opens_at ||
+        !day.closes_at ||
+        daysWithWorkers.has(dayIndex)
+      ) {
+        return [];
+      }
+
+      return [dayName];
+    },
+  );
+
+  const readinessAlerts: ReadinessAlert[] = [];
+
+  if (activeServiceIds.size === 0) {
+    readinessAlerts.push({
+      key: "services",
+      title: "Aktivne usluge",
+      description:
+        "Potrebna je bar jedna aktivna usluga da bi klijent imao sta da zakaze.",
+      href: "/admin/usluge",
+    });
+  }
+
+  if (workerIds.size === 0) {
+    readinessAlerts.push({
+      key: "workers",
+      title: "Dostupni radnici",
+      description:
+        "Potreban je bar jedan radnik koji moze da prima online termine.",
+      href: "/admin/radnici",
+    });
+  }
+
+  if (workerIds.size > 0 && activeServiceIds.size > 0) {
+    if (!hasWorkerServiceAssignments) {
+      readinessAlerts.push({
+        key: "worker_services",
+        title: "Povezane usluge",
+        description: "Svaki radnik treba da ima dodeljene usluge koje stvarno radi.",
+        href: "/admin/radnici",
+      });
+    } else {
+      if (workersWithoutServices.length > 0) {
+        const names = workersWithoutServices.map((worker) => worker.name).join(", ");
+        readinessAlerts.push({
+          key: "workers_without_services",
+          title: "Radnici bez usluga",
+          description:
+            workersWithoutServices.length === 1
+              ? `${names} nema dodeljene usluge.`
+              : `${workersWithoutServices.length} radnika nemaju dodeljene usluge: ${names}.`,
+          href: "/admin/radnici",
+        });
+      }
+
+      if (servicesWithoutWorkers.length > 0) {
+        readinessAlerts.push({
+          key: "services_without_workers",
+          title: "Aktivne usluge bez radnika",
+          description:
+            servicesWithoutWorkers.length === 1
+              ? "Jedna aktivna usluga nema nijednog radnika koji je izvodi."
+              : `${servicesWithoutWorkers.length} aktivnih usluga nema dodeljene radnike.`,
+          href: "/admin/usluge",
+        });
+      }
+    }
+  }
+
+  if (!hasOpenWorkingHours) {
+    readinessAlerts.push({
+      key: "working_hours",
+      title: "Radno vreme",
+      description: "Ovo je osnovni okvir u kom salon ili studio uopste prima termine.",
+      href: "/admin/radno-vreme",
+    });
+  }
+
+  if (workerIds.size > 0 && hasOpenWorkingHours) {
+    if (!hasWorkerSchedule) {
+      readinessAlerts.push({
+        key: "worker_schedule",
+        title: "Raspored radnika",
+        description:
+          "Radnik mora imati raspored ili smenu da bi se pojavili slobodni termini.",
+        href: "/admin/raspored",
+      });
+    } else {
+      if (openDaysWithoutWorkers.length > 0) {
+        readinessAlerts.push({
+          key: "open_days_without_workers",
+          title: "Raspored radnika",
+          description:
+            openDaysWithoutWorkers.length === 1
+              ? `Dodaj radnika za ${openDaysWithoutWorkers[0]} ili zatvori taj dan u radnom vremenu.`
+              : `Dodaj radnike za otvorene dane bez pokrica: ${openDaysWithoutWorkers.join(", ")}.`,
+          href: "/admin/raspored",
+        });
+      }
+
+      if (invalidScheduleRows.length > 0) {
+        readinessAlerts.push({
+          key: "schedule_outside_hours",
+          title: "Smene van radnog vremena",
+          description:
+            invalidScheduleRows.length === 1
+              ? "Jedna smena ili raspored je van otvorenog radnog vremena."
+              : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+          href: "/admin/raspored",
+        });
+      }
+    }
+  }
 
   return (
     <main className="flex flex-1 bg-[radial-gradient(circle_at_top,theme(colors.brand-soft),transparent_42%),linear-gradient(to_bottom,theme(colors.background),theme(colors.background))] px-4 py-8 sm:px-6 sm:py-10">
@@ -89,7 +327,7 @@ export default async function AdminSitePage() {
                   Admin
                 </Link>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                  Vasa stranica
+                  Vaša stranica
                 </h1>
                 <p className="max-w-xl text-muted-foreground">
                   Uredi javnu stranicu za zakazi.pro/{provider.slug}
@@ -114,6 +352,29 @@ export default async function AdminSitePage() {
             </div>
           </div>
         </header>
+
+        {readinessAlerts.length ? (
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-destructive">
+                Treba popraviti
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ovo direktno utiče na to šta klijent vidi i može da zakaže na vašoj stranici.
+              </p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {readinessAlerts.map((alert) => (
+                <AdminAlertBox
+                  key={alert.key}
+                  title={alert.title}
+                  description={alert.description}
+                  href={alert.href}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="grid gap-8">
           <div className="space-y-8">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 
 export const metadata = {
   title: "Usluge | zakazi.pro",
@@ -16,12 +17,31 @@ function formatPrice(price: number | null) {
 export default async function ServicesPage() {
   const { supabase, provider } = await getCurrentProvider();
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("id, name, duration_minutes, price, is_active, sort_order")
-    .eq("provider_id", provider.id)
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
+  const [{ data: services }, { data: workerServices }, { data: activeWorkers }] =
+    await Promise.all([
+      supabase
+        .from("services")
+        .select("id, name, duration_minutes, price, is_active, sort_order")
+        .eq("provider_id", provider.id)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase.from("worker_services").select("worker_id, service_id"),
+      supabase
+        .from("workers")
+        .select("id")
+        .eq("provider_id", provider.id)
+        .is("archived_at", null),
+    ]);
+
+  const activeWorkerIds = new Set((activeWorkers ?? []).map((worker) => worker.id));
+  const servicesWithWorkers = new Set(
+    (workerServices ?? [])
+      .filter((row) => activeWorkerIds.has(row.worker_id))
+      .map((row) => row.service_id),
+  );
+  const servicesWithoutWorkers = (services ?? []).filter(
+    (service) => service.is_active && !servicesWithWorkers.has(service.id),
+  );
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -46,6 +66,17 @@ export default async function ServicesPage() {
             Dodaj uslugu
           </Link>
         </header>
+
+        {servicesWithoutWorkers.length ? (
+          <AdminAlertBox
+            title="Aktivne usluge bez radnika"
+            description={
+              servicesWithoutWorkers.length === 1
+                ? `"${servicesWithoutWorkers[0].name}" nema nijednog radnika koji je izvodi — klijent je vidi, ali ne moze da je zakaze.`
+                : `${servicesWithoutWorkers.length} aktivnih usluga nema dodeljene radnike: ${servicesWithoutWorkers.map((service) => service.name).join(", ")}.`
+            }
+          />
+        ) : null}
 
         <div className="overflow-hidden rounded-md border border-border bg-card">
           {services?.length ? (
