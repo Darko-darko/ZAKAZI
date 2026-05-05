@@ -68,8 +68,7 @@ export default async function WorkingHoursPage() {
         </header>
 
         <div className="rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
-          Ovo je okvir kada ordinacija ili salon prima termine. Smene i custom
-          vreme radnika se seku sa ovim vremenom pri prikazu slobodnih termina.
+          Unesi dane i vreme kada si dostupan za zakazivanje.
         </div>
 
         <WorkingHoursForm
