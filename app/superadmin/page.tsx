@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/auth/actions";
+import { listAgentsForAdmin } from "@/lib/auth/agent-compat";
+import { normalizeAgentRole } from "@/lib/auth/roles";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
 import {
   confirmInvoicePaymentAction,
@@ -28,6 +30,7 @@ type ProviderRow = {
   plan: string;
   plan_status: string;
   agent_id: string | null;
+  referrer_agent_id: string | null;
 };
 
 type InvoiceRow = {
@@ -46,6 +49,7 @@ type InvoiceRow = {
 type AgentRow = {
   id: string;
   name: string;
+  role: string | null;
 };
 
 function formatMoney(amount: number) {
@@ -109,6 +113,18 @@ function invoiceTone(invoice: InvoiceRow) {
   };
 }
 
+function formatPaymentMethod(method: string | null) {
+  if (method === "cash") {
+    return "Kes";
+  }
+
+  if (method === "virman") {
+    return "Poslovni racun";
+  }
+
+  return "Nije izabrano";
+}
+
 export default async function SuperAdminPage({
   searchParams,
 }: SuperAdminPageProps) {
@@ -119,39 +135,43 @@ export default async function SuperAdminPage({
   const errorReason = firstParam(query.reason) ?? "";
   const { admin } = await requireSuperAdmin();
 
-  const [
-    { count: agentsCount },
-    { data: providers },
-    { data: pendingCommissions },
-    { data: invoices },
-    { data: agents },
-    { data: platformRow },
-  ] = await Promise.all([
-    admin.from("agents").select("*", { count: "exact", head: true }),
-    admin
-      .from("providers")
-      .select("id, name, slug, city, billing_email, plan, plan_status, agent_id")
-      .order("created_at", { ascending: false }),
-    admin
-      .from("agent_commissions")
-      .select("amount, status")
-      .neq("status", "paid"),
-    admin
-      .from("invoices")
-      .select(
-        "id, provider_id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_method, created_at",
-      )
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false }),
-    admin.from("agents").select("id, name"),
-    admin
-      .from("platform_settings")
-      .select(
-        "company_legal_name, company_pib, company_mb, company_address, company_city, company_zip, bank_name, account_number, iban, is_vat_payer, vat_rate, contact_email, contact_phone",
-      )
-      .eq("id", 1)
-      .maybeSingle(),
-  ]);
+  const providersQuery = await admin
+    .from("providers")
+    .select(
+      "id, name, slug, city, billing_email, plan, plan_status, agent_id, referrer_agent_id",
+    )
+    .order("created_at", { ascending: false });
+  const legacyProvidersQuery = providersQuery.error?.message
+    ?.toLowerCase()
+    .includes("referrer_agent_id")
+    ? await admin
+        .from("providers")
+        .select("id, name, slug, city, billing_email, plan, plan_status, agent_id")
+        .order("created_at", { ascending: false })
+    : null;
+
+  const [{ data: pendingCommissions }, { data: invoices }, { data: agents }, { data: platformRow }] =
+    await Promise.all([
+      admin
+        .from("agent_commissions")
+        .select("amount, status")
+        .neq("status", "paid"),
+      admin
+        .from("invoices")
+        .select(
+          "id, provider_id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_method, created_at",
+        )
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: false }),
+      listAgentsForAdmin(admin),
+      admin
+        .from("platform_settings")
+        .select(
+          "company_legal_name, company_pib, company_mb, company_address, company_city, company_zip, bank_name, account_number, iban, is_vat_payer, vat_rate, contact_email, contact_phone",
+        )
+        .eq("id", 1)
+        .maybeSingle(),
+    ]);
 
   const platform = platformRow ?? {
     company_legal_name: null,
@@ -169,9 +189,21 @@ export default async function SuperAdminPage({
     contact_phone: null,
   };
 
-  const providerRows = (providers ?? []) as ProviderRow[];
+  const providerRows =
+    (providersQuery.data ??
+      legacyProvidersQuery?.data?.map((provider) => ({
+        ...provider,
+        referrer_agent_id: provider.agent_id,
+      })) ??
+      []) as ProviderRow[];
   const invoiceRows = (invoices ?? []) as InvoiceRow[];
   const agentRows = (agents ?? []) as AgentRow[];
+  const topLevelAgentsCount = agentRows.filter(
+    (agent) => normalizeAgentRole(agent.role) === "agent",
+  ).length;
+  const commercialistsCount = agentRows.filter(
+    (agent) => normalizeAgentRole(agent.role) === "commercialist",
+  ).length;
 
   const pendingTotal = (pendingCommissions ?? []).reduce(
     (sum, commission) => sum + (commission.amount ?? 0),
@@ -292,7 +324,10 @@ export default async function SuperAdminPage({
           <div className="rounded-md border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground">Agenti</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {agentsCount ?? 0}
+              {topLevelAgentsCount}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Komercijalisti: {commercialistsCount}
             </p>
           </div>
           <div className="rounded-md border border-border bg-card p-5">
@@ -323,10 +358,10 @@ export default async function SuperAdminPage({
               className="block rounded-md border border-border bg-card p-5 transition hover:bg-accent"
             >
               <p className="text-base font-semibold text-foreground">
-                Agenti →
+                Agenti i komercijalisti →
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Kreiraj nove agente, podesi % provizije, deaktiviraj naloge.
+                Kreiraj agente, prati mrezu i upravljaj provizijama cele hijerarhije.
               </p>
             </Link>
           </div>
@@ -363,9 +398,15 @@ export default async function SuperAdminPage({
                           <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                             {formatPlanStatus(provider.plan_status)}
                           </span>
-                          {provider.agent_id ? (
+                          {provider.referrer_agent_id ? (
                             <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                              Agent: {agentNameById.get(provider.agent_id) ?? "dodeljen"}
+                              Referral:{" "}
+                              {agentNameById.get(provider.referrer_agent_id) ?? "dodeljen"}
+                            </span>
+                          ) : null}
+                          {provider.agent_id && provider.agent_id !== provider.referrer_agent_id ? (
+                            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                              Mreza agenta: {agentNameById.get(provider.agent_id) ?? "dodeljen"}
                             </span>
                           ) : null}
                         </div>
@@ -394,6 +435,9 @@ export default async function SuperAdminPage({
                               </p>
                               <div className="mt-3 flex flex-wrap gap-2 text-sm text-muted-foreground">
                                 <span>Rok: {formatDate(currentInvoice.due_at)}</span>
+                                <span>
+                                  Nacin: {formatPaymentMethod(currentInvoice.payment_method)}
+                                </span>
                                 {currentInvoice.payment_claimed_at ? (
                                   <span>
                                     Prijavljeno: {formatDate(currentInvoice.payment_claimed_at)}
@@ -495,6 +539,9 @@ export default async function SuperAdminPage({
                                   </p>
                                   <p className="mt-1 text-sm text-muted-foreground">
                                     Potvrdjeno: {formatDate(invoice.paid_at)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Nacin: {formatPaymentMethod(invoice.payment_method)}
                                   </p>
                                 </div>
                                 <p className="text-sm font-semibold text-foreground">

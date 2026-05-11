@@ -1,5 +1,12 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { getAgentForUser } from "@/lib/auth/agent-compat";
+
+export type AgentRole = "agent" | "commercialist";
+
+export function normalizeAgentRole(role: string | null | undefined): AgentRole {
+  return role === "commercialist" ? "commercialist" : "agent";
+}
 
 export function getSuperAdminEmails() {
   return (process.env.SUPER_ADMIN_EMAILS ?? "admin@zakazi.pro")
@@ -30,14 +37,12 @@ export async function getPostLoginRedirect(
     return "/admin";
   }
 
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data: agent } = await getAgentForUser(supabase, user.id);
 
-  if (agent) {
-    return "/agent";
+  if (agent?.is_active && !agent.archived_at) {
+    return normalizeAgentRole(agent.role) === "commercialist"
+      ? "/komercijalista"
+      : "/agent";
   }
 
   if (isSuperAdminEmail(user.email)) {

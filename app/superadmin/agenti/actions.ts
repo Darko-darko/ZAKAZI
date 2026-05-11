@@ -46,6 +46,11 @@ function isDuplicateError(message: string | undefined) {
   return message?.toLowerCase().includes("duplicate") ?? false;
 }
 
+function isMissingRoleColumnError(message: string | undefined) {
+  const normalized = message?.toLowerCase() ?? "";
+  return normalized.includes("column") && normalized.includes("role");
+}
+
 function parsePercent(value: string) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
@@ -126,14 +131,27 @@ export async function createAgentAction(
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const refCode = generateRefCodeCandidate();
-    const { error: insertError } = await admin.from("agents").insert({
+    const payload = {
       user_id: created.user.id,
       name,
       email,
       phone: phone || null,
       ref_code: refCode,
       default_commission_percent: percent,
-    });
+      role: "agent",
+    };
+    let { error: insertError } = await admin.from("agents").insert(payload);
+
+    if (insertError && isMissingRoleColumnError(insertError.message)) {
+      ({ error: insertError } = await admin.from("agents").insert({
+        user_id: created.user.id,
+        name,
+        email,
+        phone: phone || null,
+        ref_code: refCode,
+        default_commission_percent: percent,
+      }));
+    }
 
     if (!insertError) {
       savedRefCode = refCode;

@@ -2,11 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ReferralLinkActions } from "@/app/_components/referral-link-actions";
 import { logoutAction } from "@/app/auth/actions";
+import { getAgentForUser } from "@/lib/auth/agent-compat";
+import { normalizeAgentRole } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
+import {
+  archiveCommercialistAction,
+  updateCommercialistCommissionAction,
+} from "./actions";
+import { NewCommercialistForm } from "./new-commercialist-form";
 import { RegisterProviderForm } from "./register-form";
 
 export const metadata = {
-  title: "Partner | zakazi.pro",
+  title: "Agent | zakazi.pro",
 };
 
 const PLAN_STATUS_LABEL: Record<string, string> = {
@@ -27,7 +34,7 @@ function formatDate(value: string | null) {
   if (!value) {
     return "—";
   }
-  return new Intl.DateTimeFormat("sr-RS", {
+  return new Intl.DateTimeFormat("sr-Latn-RS", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -71,39 +78,90 @@ export default async function AgentPage() {
     redirect("/login");
   }
 
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("id, name, ref_code, default_commission_percent")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
+  const { data: agent } = await getAgentForUser(supabase, userData.user.id);
 
   if (!agent) {
     redirect("/admin");
   }
 
-  const [{ data: providers }, { data: commissions }] = await Promise.all([
-    supabase
-      .from("providers")
-      .select("id, name, slug, city, plan_status, created_at")
-      .eq("agent_id", agent.id)
-      .order("created_at", { ascending: false }),
+  if (normalizeAgentRole(agent.role) === "commercialist") {
+    redirect("/komercijalista");
+  }
+
+  if (!agent.is_active || agent.archived_at) {
+    redirect("/login");
+  }
+
+  const providersQuery = await supabase
+    .from("providers")
+    .select("id, name, slug, city, plan_status, created_at, referrer_agent_id")
+    .eq("agent_id", agent.id)
+    .order("created_at", { ascending: false });
+  const legacyProvidersQuery = providersQuery.error?.message
+    ?.toLowerCase()
+    .includes("referrer_agent_id")
+    ? await supabase
+        .from("providers")
+        .select("id, name, slug, city, plan_status, created_at, agent_id")
+        .eq("agent_id", agent.id)
+        .order("created_at", { ascending: false })
+    : null;
+
+  const [{ data: commissions }, commercialistsQuery] = await Promise.all([
     supabase
       .from("agent_commissions")
       .select("id, amount, status, created_at, approved_at, paid_at, provider_id")
       .eq("agent_id", agent.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("agents")
+      .select(
+        "id, name, email, phone, ref_code, default_commission_percent, is_active, archived_at, created_at",
+      )
+      .eq("parent_agent_id", agent.id)
+      .eq("role", "commercialist")
+      .order("created_at", { ascending: false }),
   ]);
 
-  const providersById = new Map(
-    (providers ?? []).map((p) => [p.id, p.name] as const),
-  );
+  const providers =
+    providersQuery.data ??
+    legacyProvidersQuery?.data?.map((provider) => ({
+      ...provider,
+      referrer_agent_id: provider.agent_id,
+    })) ??
+    [];
+  const commercialists =
+    commercialistsQuery.error?.message?.toLowerCase().includes("parent_agent_id") ||
+    commercialistsQuery.error?.message?.toLowerCase().includes("role")
+      ? []
+      : (commercialistsQuery.data ?? []);
 
-  const totalPaid = (commissions ?? [])
-    .filter((c) => c.status === "paid")
-    .reduce((sum, c) => sum + (c.amount ?? 0), 0);
+  const commercialistById = new Map(
+    (commercialists ?? []).map((item) => [item.id, item]),
+  );
+  const providersById = new Map(
+    (providers ?? []).map((provider) => [provider.id, provider.name] as const),
+  );
+  const providersByCommercialist = new Map<string, number>();
+  let directProviderCount = 0;
+
+  for (const provider of providers ?? []) {
+    if (provider.referrer_agent_id === agent.id) {
+      directProviderCount += 1;
+      continue;
+    }
+
+    if (provider.referrer_agent_id) {
+      providersByCommercialist.set(
+        provider.referrer_agent_id,
+        (providersByCommercialist.get(provider.referrer_agent_id) ?? 0) + 1,
+      );
+    }
+  }
+
   const totalPending = (commissions ?? [])
-    .filter((c) => c.status !== "paid")
-    .reduce((sum, c) => sum + (c.amount ?? 0), 0);
+    .filter((item) => item.status !== "paid")
+    .reduce((sum, item) => sum + (item.amount ?? 0), 0);
 
   const monthlyCommissionsByKey = new Map<string, MonthlyCommissionSummary>();
 
@@ -155,17 +213,17 @@ export default async function AgentPage() {
 
   return (
     <main className="flex flex-1 px-4 py-8 sm:px-6 sm:py-10">
-      <section className="mx-auto w-full max-w-5xl space-y-8">
+      <section className="mx-auto w-full max-w-6xl space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Partner panel
+              Agent panel
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {agent.name}
             </h1>
             <p className="text-muted-foreground">
-              Provizija po default-u: {agent.default_commission_percent}%
+              Tvoja ukupna mrežna provizija: {agent.default_commission_percent}%
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -183,17 +241,23 @@ export default async function AgentPage() {
           </div>
         </header>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-md border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Mojih klijenata</p>
+            <p className="text-sm text-muted-foreground">Saloni u mreži</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
               {providers?.length ?? 0}
             </p>
           </div>
           <div className="rounded-md border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Provizija isplaćena</p>
+            <p className="text-sm text-muted-foreground">Direktno tvoji saloni</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatMoney(totalPaid)}
+              {directProviderCount}
+            </p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-5">
+            <p className="text-sm text-muted-foreground">Komercijalisti</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {commercialists?.length ?? 0}
             </p>
           </div>
           <div className="rounded-md border border-border bg-card p-5">
@@ -209,7 +273,7 @@ export default async function AgentPage() {
             Moj referral link
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pošalji ovaj link salonu da registracija automatski bude pripisana tebi.
+            Kada salon dođe direktno preko ovog linka, pripisuje se tebi.
           </p>
           <div className="mt-4 max-w-2xl">
             <ReferralLinkActions refCode={agent.ref_code} />
@@ -218,11 +282,22 @@ export default async function AgentPage() {
 
         <section className="rounded-md border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-foreground">
+            Novi komercijalista
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Kreiraš login, referral kod i početni procenat iz svog dela.
+          </p>
+          <div className="mt-5">
+            <NewCommercialistForm maxPercent={agent.default_commission_percent} />
+          </div>
+        </section>
+
+        <section className="rounded-md border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-foreground">
             Registruj novi salon
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Forma kreira nalog klijenta na licu mesta. Lozinku diktiraš klijentu
-            posle uspešne registracije.
+            Možeš direktno registrovati salon, a može i komercijalista iz svog panela.
           </p>
           <div className="mt-5">
             <RegisterProviderForm />
@@ -230,38 +305,169 @@ export default async function AgentPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-foreground">Moji klijenti</h2>
-          {providers && providers.length > 0 ? (
-            <div className="divide-y divide-border rounded-md border border-border bg-card">
-              {providers.map((provider) => (
-                <div
-                  key={provider.id}
-                  className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {provider.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      zakazi.pro/{provider.slug}
-                      {provider.city ? ` · ${provider.city}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
-                      {PLAN_STATUS_LABEL[provider.plan_status] ??
-                        provider.plan_status}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {formatDate(provider.created_at)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              Tvoji komercijalisti
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Vidiš referral link, procenat i koliko je salona svaki doveo.
+            </p>
+          </div>
+          {commercialists && commercialists.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border border-border bg-card [touch-action:pan-x]">
+              <table className="min-w-[880px] w-full text-sm">
+                <thead className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Komercijalista</th>
+                    <th className="px-4 py-3 font-medium">Referral</th>
+                    <th className="px-4 py-3 font-medium">Provizija</th>
+                    <th className="px-4 py-3 font-medium">Saloni</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {commercialists.map((commercialist) => {
+                    const providerCount =
+                      providersByCommercialist.get(commercialist.id) ?? 0;
+                    const isArchived = Boolean(commercialist.archived_at);
+
+                    return (
+                      <tr key={commercialist.id} className="align-top">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-foreground">
+                            {commercialist.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {commercialist.email}
+                          </p>
+                          {commercialist.phone ? (
+                            <p className="text-xs text-muted-foreground">
+                              {commercialist.phone}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          <ReferralLinkActions
+                            refCode={commercialist.ref_code}
+                            compact
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <form
+                            action={updateCommercialistCommissionAction}
+                            className="flex items-center gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="commercialist_id"
+                              value={commercialist.id}
+                            />
+                            <input
+                              type="number"
+                              name="default_commission_percent"
+                              min={0}
+                              max={agent.default_commission_percent}
+                              defaultValue={commercialist.default_commission_percent}
+                              className="w-20 rounded-md border border-input bg-background px-2 py-1 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
+                            >
+                              Sačuvaj
+                            </button>
+                          </form>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {providerCount}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col items-start gap-2">
+                            <span
+                              className={`rounded-md border px-2 py-1 text-xs font-medium ${
+                                isArchived
+                                  ? "border-border bg-muted text-muted-foreground"
+                                  : "border-green-500/40 bg-green-500/10 text-green-700"
+                              }`}
+                            >
+                              {isArchived ? "Arhiviran" : "Aktivan"}
+                            </span>
+                            <form action={archiveCommercialistAction}>
+                              <input
+                                type="hidden"
+                                name="commercialist_id"
+                                value={commercialist.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="next_archived"
+                                value={(!isArchived).toString()}
+                              />
+                              <button
+                                type="submit"
+                                className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
+                              >
+                                {isArchived ? "Vrati iz arhive" : "Arhiviraj"}
+                              </button>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Jos nemas registrovanih klijenata. Registruj prvi gore.
+              Još nema komercijalista. Kreiraj prvog iz forme iznad.
+            </p>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold text-foreground">Saloni u mreži</h2>
+          {providers && providers.length > 0 ? (
+            <div className="divide-y divide-border rounded-md border border-border bg-card">
+              {providers.map((provider) => {
+                const owner =
+                  provider.referrer_agent_id === agent.id
+                    ? "Direktno tvoj referral"
+                    : commercialistById.get(provider.referrer_agent_id ?? "")?.name ??
+                      "Komercijalista";
+
+                return (
+                  <div
+                    key={provider.id}
+                    className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {provider.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        zakazi.pro/{provider.slug}
+                        {provider.city ? ` · ${provider.city}` : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {owner}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
+                        {PLAN_STATUS_LABEL[provider.plan_status] ?? provider.plan_status}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {formatDate(provider.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Još nema salona u tvojoj mreži.
             </p>
           )}
         </section>
@@ -269,11 +475,10 @@ export default async function AgentPage() {
         <section className="space-y-3">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
-              Mesecni obracun
+              Mesečni obračun
             </h2>
             <p className="text-sm text-muted-foreground">
-              Ovde vidis kada je provizija obracunata, odobrena i potvrdjena kao
-              isplacena.
+              Ovde vidiš kada je tvoj deo provizije obračunat, odobren i isplaćen.
             </p>
           </div>
           {monthlyCommissions.length ? (
@@ -297,7 +502,7 @@ export default async function AgentPage() {
                     </div>
                     <div className="grid gap-2 text-sm sm:min-w-[24rem] sm:grid-cols-3">
                       <div className="rounded-md border border-border bg-background px-3 py-2">
-                        <p className="text-xs text-muted-foreground">Ceka</p>
+                        <p className="text-xs text-muted-foreground">Čeka</p>
                         <p className="font-semibold text-foreground">
                           {formatMoney(summary.pending)}
                         </p>
@@ -309,7 +514,7 @@ export default async function AgentPage() {
                         </p>
                       </div>
                       <div className="rounded-md border border-border bg-background px-3 py-2">
-                        <p className="text-xs text-muted-foreground">Isplaceno</p>
+                        <p className="text-xs text-muted-foreground">Isplaćeno</p>
                         <p className="font-semibold text-foreground">
                           {formatMoney(summary.paid)}
                         </p>
@@ -317,7 +522,7 @@ export default async function AgentPage() {
                     </div>
                   </div>
                   <div className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                    Odobreno: {formatDate(summary.approvedAt)} · Isplaceno:{" "}
+                    Odobreno: {formatDate(summary.approvedAt)} · Isplaćeno:{" "}
                     {formatDate(summary.paidAt)}
                   </div>
                 </article>
@@ -325,7 +530,7 @@ export default async function AgentPage() {
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Jos nema mesecnih obracuna.
+              Još nema mesečnih obračuna.
             </p>
           )}
         </section>
@@ -354,8 +559,7 @@ export default async function AgentPage() {
                       {formatMoney(commission.amount)}
                     </span>
                     <span className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
-                      {COMMISSION_STATUS_LABEL[commission.status] ??
-                        commission.status}
+                      {COMMISSION_STATUS_LABEL[commission.status] ?? commission.status}
                     </span>
                   </div>
                 </div>
@@ -363,7 +567,7 @@ export default async function AgentPage() {
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Provizije će se pojaviti ovde kada salon plati prvu fakturu.
+              Provizije će se pojaviti ovde kada salon plati fakturu.
             </p>
           )}
         </section>

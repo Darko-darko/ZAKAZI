@@ -13,9 +13,19 @@ export const dynamic = "force-dynamic";
 
 const PAYMENT_TERM_DAYS = 14;
 
-function placeholder(value: string | null | undefined, fallback: string) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : fallback;
+function firstFilled(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return "";
+}
+
+function fallbackText(value: string, fallback = "—") {
+  return value || fallback;
 }
 
 function addDays(date: Date, days: number) {
@@ -39,7 +49,7 @@ export async function GET(request: NextRequest) {
     admin
       .from("providers")
       .select(
-        "id, name, plan, trial_ends_at, company_name, company_pib, company_mb, company_address, company_city, company_zip",
+        "id, name, plan, trial_ends_at, address, city, company_name, company_pib, company_mb, company_address, company_city, company_zip",
       )
       .eq("id", providerId)
       .maybeSingle(),
@@ -57,12 +67,12 @@ export async function GET(request: NextRequest) {
   }
 
   const platformDetails: InvoicePlatformDetails = {
-    legalName: placeholder(platform?.company_legal_name, "<Naziv platforme>"),
-    pib: placeholder(platform?.company_pib, "<PIB>"),
-    mb: placeholder(platform?.company_mb, "<MB>"),
-    address: placeholder(platform?.company_address, "<Adresa>"),
-    city: placeholder(platform?.company_city, "<Grad>"),
-    zip: placeholder(platform?.company_zip, "<ZIP>"),
+    legalName: fallbackText(firstFilled(platform?.company_legal_name), "zakazi.pro"),
+    pib: fallbackText(firstFilled(platform?.company_pib)),
+    mb: fallbackText(firstFilled(platform?.company_mb)),
+    address: fallbackText(firstFilled(platform?.company_address)),
+    city: fallbackText(firstFilled(platform?.company_city)),
+    zip: fallbackText(firstFilled(platform?.company_zip)),
     bankName: platform?.bank_name ?? null,
     accountNumber: platform?.account_number ?? null,
     iban: platform?.iban ?? null,
@@ -73,12 +83,12 @@ export async function GET(request: NextRequest) {
   };
 
   const customerDetails: InvoicePartyDetails = {
-    legalName: placeholder(provider.company_name, `<${provider.name}>`),
-    pib: placeholder(provider.company_pib, "<PIB salona>"),
-    mb: placeholder(provider.company_mb, "<MB salona>"),
-    address: placeholder(provider.company_address, "<Adresa salona>"),
-    city: placeholder(provider.company_city, "<Grad salona>"),
-    zip: placeholder(provider.company_zip, "<ZIP>"),
+    legalName: fallbackText(firstFilled(provider.company_name, provider.name), provider.name),
+    pib: fallbackText(firstFilled(provider.company_pib)),
+    mb: fallbackText(firstFilled(provider.company_mb)),
+    address: fallbackText(firstFilled(provider.company_address, provider.address)),
+    city: fallbackText(firstFilled(provider.company_city, provider.city)),
+    zip: fallbackText(firstFilled(provider.company_zip)),
   };
 
   const planDetails = getPlan(provider.plan);
