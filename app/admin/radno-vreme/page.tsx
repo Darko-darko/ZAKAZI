@@ -76,6 +76,7 @@ export default async function WorkingHoursPage() {
         </div>
 
         <WorkingHoursForm
+          key={JSON.stringify(hours?.length ? hours : defaultHours)}
           action={updateWorkingHoursAction}
           hours={hours?.length ? hours : defaultHours}
         />
