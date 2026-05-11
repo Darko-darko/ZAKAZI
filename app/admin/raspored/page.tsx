@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
+import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
 import { updateScheduleMatrixAction } from "./actions";
 import { ScheduleMatrixForm } from "./schedule-matrix-form";
 
@@ -74,17 +75,21 @@ export default async function SchedulePage() {
         .order("day_of_week", { ascending: true }),
     ]);
   const scheduleRows = (schedules ?? []) as ScheduleRow[];
+  const workerIds = new Set((workers ?? []).map((worker) => worker.id));
+  const relevantScheduleRows = scheduleRows.filter((row) =>
+    workerIds.has(row.worker_id),
+  );
   const workingHourRows = (workingHours ?? []) as WorkingHourRow[];
   const shiftRows = (shifts ?? []) as ShiftRow[];
   const shiftsById = new Map(shiftRows.map((shift) => [shift.id, shift]));
   const workingHoursByDay = new Map(
     workingHourRows.map((row) => [row.day_of_week, row]),
   );
-  const hasAnySchedule = scheduleRows.some(
+  const hasAnySchedule = relevantScheduleRows.some(
     (schedule) => schedule.shift_id || schedule.custom_start_time,
   );
   const daysWithWorkers = new Set(
-    scheduleRows
+    relevantScheduleRows
       .filter((schedule) => schedule.shift_id || schedule.custom_start_time)
       .map((schedule) => schedule.day_of_week),
   );
@@ -111,19 +116,30 @@ export default async function SchedulePage() {
       };
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
-  const invalidScheduleRows = scheduleRows.filter((row) => {
+  const invalidScheduleRows = relevantScheduleRows.filter((row) => {
     const day = workingHoursByDay.get(row.day_of_week);
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
 
     if (!day || day.is_closed) {
-      return Boolean(shift);
+      return Boolean(shift || row.custom_start_time);
     }
 
-    if (!shift || !day.opens_at || !day.closes_at) {
+    if (!day.opens_at || !day.closes_at) {
       return false;
     }
 
-    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    if (shift) {
+      return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    }
+
+    if (row.custom_start_time && row.custom_end_time) {
+      return (
+        row.custom_start_time < day.opens_at ||
+        row.custom_end_time > day.closes_at
+      );
+    }
+
+    return false;
   });
   const showNoScheduleAlert =
     !hasAnySchedule && (workers ?? []).length > 0 && workingHourRows.some((row) => !row.is_closed);
@@ -133,12 +149,7 @@ export default async function SchedulePage() {
       <section className="mx-auto w-full max-w-7xl space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Admin
-            </Link>
+            <AdminBackLink />
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
               Raspored radnika
             </h1>
@@ -198,7 +209,7 @@ export default async function SchedulePage() {
           action={updateScheduleMatrixAction}
           workers={workers ?? []}
           shifts={shifts ?? []}
-          schedules={scheduleRows}
+          schedules={relevantScheduleRows}
         />
       </section>
     </main>

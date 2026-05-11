@@ -88,3 +88,23 @@ export async function updateShiftAction(shiftId: string, formData: FormData) {
   revalidatePath(`/admin/smene/${shiftId}`);
   redirect("/admin/smene");
 }
+
+export async function deleteShiftAction(shiftId: string) {
+  const { supabase, provider } = await getCurrentProvider();
+
+  const { error } = await supabase
+    .from("shifts")
+    .delete()
+    .eq("id", shiftId)
+    .eq("provider_id", provider.id);
+
+  if (error) {
+    throw new Error("Smena nije obrisana. Pokusaj ponovo.");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/smene");
+  revalidatePath("/admin/raspored");
+  revalidatePath(`/admin/smene/${shiftId}`);
+  redirect("/admin/smene");
+}

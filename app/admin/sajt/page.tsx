@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { SiteEditor } from "./site-editor";
 import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
+import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
 
 const READINESS_WEEK_DAYS = [
   [1, "ponedeljak"],
@@ -111,7 +111,7 @@ export default async function AdminSitePage() {
       .eq("provider_id", currentProvider.id),
     supabase
       .from("worker_schedule")
-      .select("worker_id, day_of_week, shift_id, custom_start_time"),
+      .select("worker_id, day_of_week, shift_id, custom_start_time, custom_end_time"),
     supabase
       .from("shifts")
       .select("id, start_time, end_time")
@@ -126,6 +126,9 @@ export default async function AdminSitePage() {
   const allShifts = readinessShifts ?? [];
 
   const workerIds = new Set(allWorkers.map((worker) => worker.id));
+  const relevantWorkerSchedules = allWorkerSchedules.filter((row) =>
+    workerIds.has(row.worker_id),
+  );
   const activeServiceIds = new Set(
     allServices.filter((service) => service.is_active).map((service) => service.id),
   );
@@ -135,9 +138,7 @@ export default async function AdminSitePage() {
       activeServiceIds.has(assignment.service_id),
   );
   const hasOpenWorkingHours = allWorkingHours.some((row) => row.is_closed === false);
-  const hasWorkerSchedule = allWorkerSchedules.some((row) =>
-    workerIds.has(row.worker_id),
-  );
+  const hasWorkerSchedule = relevantWorkerSchedules.length > 0;
   const workingHoursByDay = new Map(
     allWorkingHours.map((row) => [row.day_of_week, row]),
   );
@@ -165,25 +166,35 @@ export default async function AdminSitePage() {
         workerIds.has(assignment.worker_id),
     );
   });
-  const invalidScheduleRows = allWorkerSchedules.filter((row) => {
+  const invalidScheduleRows = relevantWorkerSchedules.filter((row) => {
     const day = workingHoursByDay.get(row.day_of_week);
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
 
     if (!day || day.is_closed) {
-      return Boolean(shift);
+      return Boolean(shift || row.custom_start_time);
     }
 
-    if (!shift || !day.opens_at || !day.closes_at) {
+    if (!day.opens_at || !day.closes_at) {
       return false;
     }
 
-    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    if (shift) {
+      return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    }
+
+    if (row.custom_start_time && row.custom_end_time) {
+      return (
+        row.custom_start_time < day.opens_at ||
+        row.custom_end_time > day.closes_at
+      );
+    }
+
+    return false;
   });
   const daysWithWorkers = new Set(
-    allWorkerSchedules
+    relevantWorkerSchedules
       .filter(
-        (row) =>
-          workerIds.has(row.worker_id) && (row.shift_id || row.custom_start_time),
+        (row) => row.shift_id || row.custom_start_time,
       )
       .map((row) => row.day_of_week),
   );
@@ -320,12 +331,7 @@ export default async function AdminSitePage() {
                 <span>Editor stranice</span>
               </div>
               <div className="space-y-2">
-                <Link
-                  href="/admin"
-                  className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                >
-                  Admin
-                </Link>
+                <AdminBackLink />
                 <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                   Vaša stranica
                 </h1>

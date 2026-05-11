@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
 
 export const metadata = {
   title: "Smene | zakazi.pro",
@@ -24,12 +25,7 @@ export default async function ShiftsPage() {
       <section className="mx-auto w-full max-w-5xl space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Admin
-            </Link>
+            <AdminBackLink />
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
               Smene
             </h1>

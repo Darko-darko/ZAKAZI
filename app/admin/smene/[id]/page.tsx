@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updateShiftAction } from "../actions";
+import { deleteShiftAction, updateShiftAction } from "../actions";
 import { ShiftForm } from "../shift-form";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { StatusActionButton } from "@/app/admin/termini/status-action-button";
 
 export const metadata = {
   title: "Uredi smenu | zakazi.pro",
@@ -28,6 +29,7 @@ export default async function ShiftEditPage({ params }: ShiftEditPageProps) {
   }
 
   const updateShift = updateShiftAction.bind(null, shift.id);
+  const deleteShift = deleteShiftAction.bind(null, shift.id);
 
   return (
     <main className="flex flex-1 px-6 py-10">
@@ -35,9 +37,10 @@ export default async function ShiftEditPage({ params }: ShiftEditPageProps) {
         <header>
           <Link
             href="/admin/smene"
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
           >
-            Smene
+            <span aria-hidden="true">&larr;</span>
+            <span>Nazad na smene</span>
           </Link>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
             {shift.name}
@@ -49,6 +52,13 @@ export default async function ShiftEditPage({ params }: ShiftEditPageProps) {
             action={updateShift}
             shift={shift}
             submitLabel="Sacuvaj izmene"
+            secondaryAction={
+              <form action={deleteShift}>
+                <StatusActionButton confirmMessage="Obrisati ovu smenu? Postojeci rasporedi koji je koriste ostaće bez dodeljene smene.">
+                  Obriši smenu
+                </StatusActionButton>
+              </form>
+            }
           />
         </div>
       </section>

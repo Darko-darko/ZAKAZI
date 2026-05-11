@@ -352,7 +352,7 @@ export default async function AdminBookingsPage({
       .eq("provider_id", provider.id),
     supabase
       .from("worker_schedule")
-      .select("id, worker_id, day_of_week, shift_id, custom_start_time"),
+      .select("id, worker_id, day_of_week, shift_id, custom_start_time, custom_end_time"),
     supabase
       .from("shifts")
       .select("id, name, start_time, end_time")
@@ -374,6 +374,9 @@ export default async function AdminBookingsPage({
   ]);
 
   const workerIds = new Set((workers ?? []).map((worker) => worker.id));
+  const relevantWorkerSchedules = (workerSchedules ?? []).filter((row) =>
+    workerIds.has(row.worker_id),
+  );
   const serviceIds = new Set(
     (services ?? [])
       .filter((service) => service.is_active)
@@ -386,9 +389,7 @@ export default async function AdminBookingsPage({
   const hasOpenWorkingHours = (workingHours ?? []).some(
     (row) => row.is_closed === false,
   );
-  const hasWorkerSchedule = (workerSchedules ?? []).some((row) =>
-    workerIds.has(row.worker_id),
-  );
+  const hasWorkerSchedule = relevantWorkerSchedules.length > 0;
   const workingHoursByDay = new Map(
     (workingHours ?? []).map((row) => [row.day_of_week, row]),
   );
@@ -412,23 +413,34 @@ export default async function AdminBookingsPage({
 
     return !(workerServices ?? []).some((assignment) => assignment.service_id === service.id);
   });
-  const invalidScheduleRows = (workerSchedules ?? []).filter((row) => {
+  const invalidScheduleRows = relevantWorkerSchedules.filter((row) => {
     const day = workingHoursByDay.get(row.day_of_week);
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null;
 
     if (!day || day.is_closed) {
-      return Boolean(shift);
+      return Boolean(shift || row.custom_start_time);
     }
 
-    if (!shift || !day.opens_at || !day.closes_at) {
+    if (!day.opens_at || !day.closes_at) {
       return false;
     }
 
-    return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    if (shift) {
+      return shift.start_time < day.opens_at || shift.end_time > day.closes_at;
+    }
+
+    if (row.custom_start_time && row.custom_end_time) {
+      return (
+        row.custom_start_time < day.opens_at ||
+        row.custom_end_time > day.closes_at
+      );
+    }
+
+    return false;
   });
   const daysWithWorkers = new Set(
-    (workerSchedules ?? [])
-      .filter((row) => workerIds.has(row.worker_id) && (row.shift_id || row.custom_start_time))
+    relevantWorkerSchedules
+      .filter((row) => row.shift_id || row.custom_start_time)
       .map((row) => row.day_of_week),
   );
   const openDaysWithoutWorkers = WEEK_DAYS.flatMap(([dayIndex, dayName]) => {

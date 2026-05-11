@@ -102,3 +102,37 @@ export async function updateServiceAction(
   revalidatePath(`/admin/usluge/${serviceId}`);
   redirect("/admin/usluge");
 }
+
+export async function deleteServiceAction(serviceId: string) {
+  const { supabase, provider } = await getCurrentProvider();
+  const { count, error: bookingsError } = await supabase
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("provider_id", provider.id)
+    .eq("service_id", serviceId);
+
+  if (bookingsError) {
+    throw new Error("Nismo uspeli da proverimo da li usluga moze da se obrise.");
+  }
+
+  if ((count ?? 0) > 0) {
+    throw new Error(
+      "Usluga ima vezane termine i ne moze da se obrise. Po potrebi je oznaci kao neaktivnu.",
+    );
+  }
+
+  const { error } = await supabase
+    .from("services")
+    .delete()
+    .eq("id", serviceId)
+    .eq("provider_id", provider.id);
+
+  if (error) {
+    throw new Error("Usluga nije obrisana. Pokusaj ponovo.");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/usluge");
+  revalidatePath(`/admin/usluge/${serviceId}`);
+  redirect("/admin/usluge");
+}
