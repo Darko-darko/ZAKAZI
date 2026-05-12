@@ -108,12 +108,90 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
-function startOfMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+function endOfDayUtc(date: Date) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      23,
+      59,
+      59,
+      999,
+    ),
+  );
 }
 
-function endOfMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+function addMonthsClamped(date: Date, months: number) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const targetMonthIndex = month + months;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const normalizedMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(targetYear, normalizedMonth + 1, 0),
+  ).getUTCDate();
+
+  return new Date(
+    Date.UTC(
+      targetYear,
+      normalizedMonth,
+      Math.min(day, lastDayOfTargetMonth),
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+      date.getUTCMilliseconds(),
+    ),
+  );
+}
+
+function sameUtcDay(left: Date, right: Date) {
+  return (
+    left.getUTCFullYear() === right.getUTCFullYear() &&
+    left.getUTCMonth() === right.getUTCMonth() &&
+    left.getUTCDate() === right.getUTCDate()
+  );
+}
+
+function resolveNextBillingPeriod(provider: ProviderBillingRow, now: Date) {
+  const trialEndsAt = provider.trial_ends_at
+    ? new Date(provider.trial_ends_at)
+    : null;
+
+  if (!trialEndsAt) {
+    return null;
+  }
+
+  let periodStart = new Date(
+    Date.UTC(
+      trialEndsAt.getUTCFullYear(),
+      trialEndsAt.getUTCMonth(),
+      trialEndsAt.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  );
+
+  if (periodStart.getTime() > now.getTime()) {
+    return null;
+  }
+
+  while (true) {
+    const nextPeriodStart = addMonthsClamped(periodStart, 1);
+
+    if (now.getTime() < nextPeriodStart.getTime()) {
+      return {
+        periodStart,
+        periodEnd: endOfDayUtc(addDays(nextPeriodStart, -1)),
+        shouldCreateToday: sameUtcDay(now, periodStart),
+      };
+    }
+
+    periodStart = nextPeriodStart;
+  }
 }
 
 function toIsoDate(date: Date) {
@@ -526,7 +604,8 @@ async function createInvoiceForPeriod(provider: ProviderBillingRow, periodStart:
     throw new Error(`Plan ${provider.plan} nema definisanu cenu.`);
   }
 
-  const periodEnd = endOfMonth(periodStart);
+  const nextPeriodStart = addMonthsClamped(periodStart, 1);
+  const periodEnd = endOfDayUtc(addDays(nextPeriodStart, -1));
   const periodFrom = toIsoDate(periodStart);
   const periodTo = toIsoDate(periodEnd);
 
@@ -583,7 +662,6 @@ export async function createMonthlyInvoices() {
   const admin = createAdminClient();
   const result = createRunResult();
   const now = new Date();
-  const currentPeriodStart = startOfMonth(now);
 
   const { data: providers, error } = await admin
     .from("providers")
@@ -629,7 +707,17 @@ export async function createMonthlyInvoices() {
         continue;
       }
 
-      const created = await createInvoiceForPeriod(provider, currentPeriodStart);
+      const billingPeriod = resolveNextBillingPeriod(provider, now);
+
+      if (!billingPeriod || !billingPeriod.shouldCreateToday) {
+        result.skipped += 1;
+        continue;
+      }
+
+      const created = await createInvoiceForPeriod(
+        provider,
+        billingPeriod.periodStart,
+      );
       if (created.created) {
         result.created += 1;
       } else {
