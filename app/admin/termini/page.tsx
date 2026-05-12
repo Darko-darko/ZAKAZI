@@ -334,7 +334,7 @@ export default async function AdminBookingsPage({
   ] = await Promise.all([
     supabase
       .from("workers")
-      .select("id, name")
+      .select("id, name, is_active")
       .eq("provider_id", provider.id)
       .is("archived_at", null)
       .order("created_at"),
@@ -373,9 +373,10 @@ export default async function AdminBookingsPage({
       .in("status", ["pending", "confirmed", "noshow"]),
   ]);
 
-  const workerIds = new Set((workers ?? []).map((worker) => worker.id));
+  const onlineWorkers = (workers ?? []).filter((worker) => worker.is_active);
+  const onlineWorkerIds = new Set(onlineWorkers.map((worker) => worker.id));
   const relevantWorkerSchedules = (workerSchedules ?? []).filter((row) =>
-    workerIds.has(row.worker_id),
+    onlineWorkerIds.has(row.worker_id),
   );
   const serviceIds = new Set(
     (services ?? [])
@@ -384,7 +385,8 @@ export default async function AdminBookingsPage({
   );
   const hasWorkerServiceAssignments = (workerServices ?? []).some(
     (assignment) =>
-      workerIds.has(assignment.worker_id) && serviceIds.has(assignment.service_id),
+      onlineWorkerIds.has(assignment.worker_id) &&
+      serviceIds.has(assignment.service_id),
   );
   const hasOpenWorkingHours = (workingHours ?? []).some(
     (row) => row.is_closed === false,
@@ -397,13 +399,17 @@ export default async function AdminBookingsPage({
   const serviceAssignmentsByWorker = new Map<string, number>();
 
   for (const assignment of workerServices ?? []) {
+    if (!onlineWorkerIds.has(assignment.worker_id)) {
+      continue;
+    }
+
     serviceAssignmentsByWorker.set(
       assignment.worker_id,
       (serviceAssignmentsByWorker.get(assignment.worker_id) ?? 0) + 1,
     );
   }
 
-  const workersWithoutServices = (workers ?? []).filter(
+  const workersWithoutServices = onlineWorkers.filter(
     (worker) => (serviceAssignmentsByWorker.get(worker.id) ?? 0) === 0,
   );
   const servicesWithoutWorkers = (services ?? []).filter((service) => {
@@ -460,7 +466,7 @@ export default async function AdminBookingsPage({
   });
   const setupCompleted = [
     serviceIds.size > 0,
-    workerIds.size > 0,
+    onlineWorkerIds.size > 0,
     hasWorkerServiceAssignments &&
       workersWithoutServices.length === 0 &&
       servicesWithoutWorkers.length === 0,
@@ -484,7 +490,7 @@ export default async function AdminBookingsPage({
     });
   }
 
-  if (workerIds.size === 0) {
+  if (onlineWorkerIds.size === 0) {
     alerts.push({
       key: "workers",
       title: "Dostupni radnici",
@@ -494,7 +500,7 @@ export default async function AdminBookingsPage({
     });
   }
 
-  if (workerIds.size > 0 && serviceIds.size > 0) {
+  if (onlineWorkerIds.size > 0 && serviceIds.size > 0) {
     if (!hasWorkerServiceAssignments) {
       alerts.push({
         key: "worker_services",
@@ -543,7 +549,7 @@ export default async function AdminBookingsPage({
     });
   }
 
-  if (workerIds.size > 0 && hasOpenWorkingHours) {
+  if (onlineWorkerIds.size > 0 && hasOpenWorkingHours) {
     if (!hasWorkerSchedule) {
       alerts.push({
         key: "worker_schedule",
