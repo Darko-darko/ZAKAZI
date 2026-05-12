@@ -59,6 +59,8 @@ export async function updateBillingDetailsAction(formData: FormData) {
 export async function claimInvoicePaymentAction(formData: FormData) {
   const { supabase } = await getCurrentProvider();
   const paymentClaimToken = readString(formData, "payment_claim_token");
+  const paymentMethodRaw = readString(formData, "payment_method");
+  const paymentMethod = paymentMethodRaw === "cash" ? "cash" : "virman";
 
   if (!paymentClaimToken) {
     redirect("/admin/naplata?error=missing-token");
@@ -66,6 +68,7 @@ export async function claimInvoicePaymentAction(formData: FormData) {
 
   const { data, error } = await supabase.rpc("claim_invoice_payment", {
     p_payment_claim_token: paymentClaimToken,
+    p_payment_method: paymentMethod,
     p_payment_proof_url: undefined,
   });
 

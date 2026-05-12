@@ -18,6 +18,7 @@ type InvoiceRow = {
   due_at: string | null;
   paid_at: string | null;
   payment_claimed_at: string | null;
+  payment_method: string | null;
   payment_claim_token: string;
   pdf_url: string | null;
 };
@@ -62,7 +63,7 @@ function formatDateLabel(value: string | null) {
 function paymentStatus(invoice: InvoiceRow) {
   if (invoice.paid_at || invoice.status === "paid") {
     return {
-      label: "Potvrdeno",
+      label: "Potvrdjeno",
       tone: "border-brand/30 bg-brand-soft text-brand",
     };
   }
@@ -87,6 +88,18 @@ function paymentStatus(invoice: InvoiceRow) {
   };
 }
 
+function formatPaymentMethod(method: string | null) {
+  if (method === "cash") {
+    return "Kes";
+  }
+
+  if (method === "virman") {
+    return "Poslovni racun";
+  }
+
+  return "Nije izabrano";
+}
+
 export default async function BillingPage({ searchParams }: BillingPageProps) {
   const query = await searchParams;
   const notice = firstParam(query.notice) ?? "";
@@ -96,7 +109,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     supabase
       .from("invoices")
       .select(
-        "id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_claim_token, pdf_url, created_at",
+        "id, number, amount, status, due_at, paid_at, payment_claimed_at, payment_method, payment_claim_token, pdf_url, created_at",
       )
       .eq("provider_id", provider.id)
       .neq("status", "cancelled")
@@ -110,6 +123,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       .eq("id", provider.id)
       .maybeSingle(),
   ]);
+
   const billing = billingRow ?? {
     company_name: null,
     company_pib: null,
@@ -130,7 +144,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const confirmedPayments = invoices
     .filter((invoice) => Boolean(invoice.paid_at))
     .sort((a, b) => {
-      return new Date(b.paid_at ?? b.due_at ?? 0).getTime() - new Date(a.paid_at ?? a.due_at ?? 0).getTime();
+      return (
+        new Date(b.paid_at ?? b.due_at ?? 0).getTime() -
+        new Date(a.paid_at ?? a.due_at ?? 0).getTime()
+      );
     });
 
   const canClaimCurrentPayment = Boolean(
@@ -148,9 +165,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     { key: "company_zip", label: "Postanski broj", value: billing.company_zip },
     { key: "billing_email", label: "Email za prijem faktura", value: billing.billing_email },
   ] as const;
-  const missingBillingFields = billingRequiredFields.filter(
-    (field) => !field.value,
-  );
+  const missingBillingFields = billingRequiredFields.filter((field) => !field.value);
   const billingComplete = missingBillingFields.length === 0;
 
   const pdfStoragePaths = invoices
@@ -238,12 +253,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
         {!billingComplete ? (
           <div className="rounded-xl border border-warm/40 bg-warm-soft px-4 py-3 text-sm text-foreground">
-            <p className="font-semibold">
-              Podaci za fakturisanje nisu kompletni.
-            </p>
+            <p className="font-semibold">Podaci za fakturisanje nisu kompletni.</p>
             <p className="mt-1">
-              Popuni sledeca polja ispod kako bi ti zakazi.pro mogao izdati
-              validnu fakturu:
+              Popuni sledeca polja ispod kako bi ti zakazi.pro mogao izdati validnu
+              fakturu:
             </p>
             <ul className="mt-2 list-disc space-y-0.5 pl-5">
               {missingBillingFields.map((field) => (
@@ -256,9 +269,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Evidencija uplata
-              </h2>
+              <h2 className="text-lg font-semibold text-foreground">Evidencija uplata</h2>
             </div>
 
             {currentInvoice ? (
@@ -281,11 +292,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
                   <span>Rok: {formatDateLabel(currentInvoice.due_at)}</span>
+                  <span>Nacin: {formatPaymentMethod(currentInvoice.payment_method)}</span>
                   {currentInvoice.payment_claimed_at ? (
                     <span>Prijavljeno: {formatDateLabel(currentInvoice.payment_claimed_at)}</span>
                   ) : null}
                   {currentInvoice.paid_at ? (
-                    <span>Potvrdeno: {formatDateLabel(currentInvoice.paid_at)}</span>
+                    <span>Potvrdjeno: {formatDateLabel(currentInvoice.paid_at)}</span>
                   ) : null}
                 </div>
               </div>
@@ -298,6 +310,40 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                       name="payment_claim_token"
                       value={currentInvoice.payment_claim_token}
                     />
+                    <fieldset className="mb-3 space-y-2 rounded-lg border border-border bg-background p-3">
+                      <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Nacin placanja
+                      </legend>
+                      <label className="flex items-start gap-3 text-sm text-foreground">
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="virman"
+                          defaultChecked
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block font-medium">Poslovni racun</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Uplata preko firme na racun sa fakture.
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 text-sm text-foreground">
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="cash"
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block font-medium">Kes</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Ako je pretplata naplacena uzivo u gotovini.
+                          </span>
+                        </span>
+                      </label>
+                    </fieldset>
                     <button className="btn-primary inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-primary-foreground">
                       Prijavi uplatu
                     </button>
@@ -306,13 +352,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
                 {currentInvoice.paid_at ? (
                   <div className="rounded-lg border border-brand/30 bg-brand-soft px-3 py-3 text-sm font-medium text-brand">
-                    Potvrdeno
+                    Potvrdjeno
                   </div>
                 ) : null}
 
                 {currentInvoice.payment_claimed_at && !currentInvoice.paid_at ? (
-                  <div className="flex items-center justify-center rounded-lg border border-primary/20 bg-primary/8 px-3 py-3 text-sm font-medium text-primary">
-                    Prijavljeno
+                  <div className="rounded-lg border border-primary/20 bg-primary/8 px-3 py-3 text-sm font-medium text-primary">
+                    Prijavljeno kao: {formatPaymentMethod(currentInvoice.payment_method)}
                   </div>
                 ) : null}
               </div>
@@ -335,9 +381,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                       <span className="inline-flex size-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-brand-foreground">
                         ✓
                       </span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatDateLabel(invoice.paid_at)}
-                      </span>
+                      <div className="text-sm text-muted-foreground">
+                        <p>{formatDateLabel(invoice.paid_at)}</p>
+                        <p className="text-xs">
+                          {formatPaymentMethod(invoice.payment_method)}
+                        </p>
+                      </div>
                     </div>
                     <span className="text-sm font-semibold text-foreground">
                       {formatMoney(invoice.amount)}
@@ -376,6 +425,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                         <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
                           <span>{formatDateLabel(invoice.due_at)}</span>
                           <span>{formatMoney(invoice.amount)}</span>
+                          <span>{formatPaymentMethod(invoice.payment_method)}</span>
                         </div>
                       </div>
 
@@ -421,8 +471,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               Podaci za fakturisanje
             </h2>
             <p className="text-sm text-muted-foreground">
-              Ovi podaci se stampaju na fakturi koju ti zakazi.pro izdaje.
-              Promenom ovih polja menjaju se i sledece fakture.
+              Ovi podaci se stampaju na fakturi koju ti zakazi.pro izdaje. Promenom
+              ovih polja menjaju se i sledece fakture.
             </p>
           </div>
 
