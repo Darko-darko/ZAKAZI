@@ -3,7 +3,10 @@ import type { Database } from "@/types/database";
 
 type ReferralAgent = {
   id: string;
+  parent_agent_id: string | null;
   ref_code: string;
+  role: string;
+  top_level_agent_id: string | null;
 };
 
 type ReferralRpcClient = SupabaseClient<Database> & {
@@ -20,7 +23,13 @@ export async function getReferralAgent(
   const normalizedRef = refCode?.trim().toUpperCase();
 
   if (!normalizedRef) {
-    return { agentId: null, refCode: null };
+    return {
+      agentId: null,
+      parentAgentId: null,
+      refCode: null,
+      role: null,
+      topLevelAgentId: null,
+    };
   }
 
   const { data, error } = await (supabase as ReferralRpcClient).rpc(
@@ -29,8 +38,20 @@ export async function getReferralAgent(
   );
 
   if (error || !data?.[0]) {
-    return { agentId: null, refCode: normalizedRef };
+    return {
+      agentId: null,
+      parentAgentId: null,
+      refCode: normalizedRef,
+      role: null,
+      topLevelAgentId: null,
+    };
   }
 
-  return { agentId: data[0].id, refCode: data[0].ref_code };
+  return {
+    agentId: data[0].id,
+    parentAgentId: data[0].parent_agent_id,
+    refCode: data[0].ref_code,
+    role: data[0].role,
+    topLevelAgentId: data[0].top_level_agent_id,
+  };
 }

@@ -290,22 +290,24 @@ export async function updatePasswordAction(
 }
 
 async function insertProviderWithAvailableSlug({
-  agentId,
   billingEmail,
   city,
+  referrerAgentId,
   name,
   phone,
   refCode,
   supabase,
+  topLevelAgentId,
   userId,
 }: {
-  agentId: string | null;
   billingEmail: string | null;
   city: string;
+  referrerAgentId: string | null;
   name: string;
   phone: string;
   refCode: string | null;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  topLevelAgentId: string | null;
   userId: string;
 }) {
   const baseSlug = createProviderSlug(name);
@@ -322,7 +324,8 @@ async function insertProviderWithAvailableSlug({
         billing_email: billingEmail,
         phone: phone || null,
         city: city || null,
-        agent_id: agentId,
+        agent_id: topLevelAgentId,
+        referrer_agent_id: referrerAgentId,
         ref_code: refCode,
       })
       .select("id")
@@ -454,7 +457,7 @@ export async function registerAction(
     };
   }
 
-  const { agentId, refCode } = await getReferralAgent(supabase, ref);
+  const referral = await getReferralAgent(supabase, ref);
   const { data: existingProvider } = await supabase
     .from("providers")
     .select("id")
@@ -463,13 +466,14 @@ export async function registerAction(
 
   if (!existingProvider) {
     const { errorMessage } = await insertProviderWithAvailableSlug({
-      agentId,
       billingEmail: email,
       city,
+      referrerAgentId: referral.agentId,
       name: providerName,
       phone,
-      refCode,
+      refCode: referral.refCode,
       supabase,
+      topLevelAgentId: referral.topLevelAgentId,
       userId: signUpData.user.id,
     });
 
@@ -539,21 +543,28 @@ export async function onboardingAction(
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
-  const { agentId, refCode } = provider
-    ? { agentId: null, refCode: null }
+  const referral = provider
+    ? {
+        agentId: null,
+        parentAgentId: null,
+        refCode: null,
+        role: null,
+        topLevelAgentId: null,
+      }
     : await getReferralAgent(supabase, ref);
 
   let providerId = provider?.id;
 
   if (!providerId) {
     const { id, errorMessage } = await insertProviderWithAvailableSlug({
-      agentId,
       billingEmail: userData.user.email ?? null,
       city,
+      referrerAgentId: referral.agentId,
       name: providerName,
       phone,
-      refCode,
+      refCode: referral.refCode,
       supabase,
+      topLevelAgentId: referral.topLevelAgentId,
       userId: userData.user.id,
     });
 

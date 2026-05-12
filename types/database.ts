@@ -77,39 +77,56 @@ export type Database = {
       }
       agents: {
         Row: {
+          archived_at: string | null
           created_at: string
           default_commission_percent: number
           email: string
           id: string
           is_active: boolean
           name: string
+          parent_agent_id: string | null
           phone: string | null
           ref_code: string
+          role: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           default_commission_percent?: number
           email: string
           id?: string
           is_active?: boolean
           name: string
+          parent_agent_id?: string | null
           phone?: string | null
           ref_code: string
+          role?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           default_commission_percent?: number
           email?: string
           id?: string
           is_active?: boolean
           name?: string
+          parent_agent_id?: string | null
           phone?: string | null
           ref_code?: string
+          role?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agents_parent_agent_id_fkey"
+            columns: ["parent_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bookings: {
         Row: {
@@ -574,6 +591,7 @@ export type Database = {
           plan_status: string
           primary_color: string
           ref_code: string | null
+          referrer_agent_id: string | null
           site_theme: string
           slug: string
           text_color: string
@@ -619,6 +637,7 @@ export type Database = {
           plan_status?: string
           primary_color?: string
           ref_code?: string | null
+          referrer_agent_id?: string | null
           site_theme?: string
           slug: string
           text_color?: string
@@ -664,6 +683,7 @@ export type Database = {
           plan_status?: string
           primary_color?: string
           ref_code?: string | null
+          referrer_agent_id?: string | null
           site_theme?: string
           slug?: string
           text_color?: string
@@ -675,6 +695,13 @@ export type Database = {
           {
             foreignKeyName: "providers_agent_id_fkey"
             columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "providers_referrer_agent_id_fkey"
+            columns: ["referrer_agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
             referencedColumns: ["id"]
@@ -1069,7 +1096,11 @@ export type Database = {
     }
     Functions: {
       claim_invoice_payment: {
-        Args: { p_payment_claim_token: string; p_payment_proof_url?: string }
+        Args: {
+          p_payment_claim_token: string
+          p_payment_method?: string
+          p_payment_proof_url?: string
+        }
         Returns: boolean
       }
       claim_booking_reminder_email_log: {
@@ -1095,6 +1126,8 @@ export type Database = {
         Returns: string
       }
       current_agent_id: { Args: never; Returns: string }
+      current_agent_role: { Args: never; Returns: string }
+      current_top_level_agent_id: { Args: never; Returns: string }
       current_provider_id: { Args: never; Returns: string }
       get_public_provider: {
         Args: { p_slug: string }
@@ -1170,7 +1203,10 @@ export type Database = {
         Args: { p_ref_code: string }
         Returns: {
           id: string
+          parent_agent_id: string | null
           ref_code: string
+          role: string
+          top_level_agent_id: string | null
         }[]
       }
     }
