@@ -1008,21 +1008,42 @@ async function listDueReminderContexts() {
 }
 
 async function claimBookingReminderLog(context: BookingEmailContext) {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("claim_booking_reminder_email_log", {
-    p_booking_id: context.id,
-    p_provider_id: context.providerId,
-    p_recipient_email: context.clientEmail,
-    p_subject: buildClientReminderSubject(context),
-  });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (error) {
+  if (!url || !serviceRoleKey) {
     throw new Error(
-      `Claim booking reminder loga nije uspeo: ${error.message}`,
+      "Supabase admin klijent nije konfigurisan. Proveri NEXT_PUBLIC_SUPABASE_URL i SUPABASE_SERVICE_ROLE_KEY u .env.local.",
     );
   }
 
-  return data;
+  const response = await fetch(
+    `${url}/rest/v1/rpc/claim_booking_reminder_email_log`,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_booking_id: context.id,
+        p_provider_id: context.providerId,
+        p_recipient_email: context.clientEmail,
+        p_subject: buildClientReminderSubject(context),
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Claim booking reminder loga nije uspeo: ${response.status} ${errorText}`,
+    );
+  }
+
+  return (await response.json()) as string | null;
 }
 
 async function completeClaimedBookingReminderLog(
