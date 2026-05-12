@@ -4,8 +4,10 @@ import { listAgentsForAdmin } from "@/lib/auth/agent-compat";
 import { normalizeAgentRole } from "@/lib/auth/roles";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
 import {
+  activateProviderAction,
   confirmInvoicePaymentAction,
   issueTestInvoiceAction,
+  suspendProviderAction,
   updatePlatformSettingsAction,
 } from "./actions";
 
@@ -305,6 +307,18 @@ export default async function SuperAdminPage({
           </div>
         ) : null}
 
+        {notice === "provider-suspended" ? (
+          <div className="rounded-xl border border-warm/40 bg-warm-soft px-4 py-3 text-sm font-medium text-foreground">
+            Nalog je rucno suspendovan.
+          </div>
+        ) : null}
+
+        {notice === "provider-activated" ? (
+          <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
+            Nalog je ponovo rucno aktiviran.
+          </div>
+        ) : null}
+
         {error === "invoice-failed" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
             Generisanje fakture nije uspelo.
@@ -317,6 +331,12 @@ export default async function SuperAdminPage({
         {error === "missing-provider" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
             Nedostaje identifikacija salona.
+          </div>
+        ) : null}
+
+        {error === "provider-status-change-failed" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Promena statusa naloga nije uspela.
           </div>
         ) : null}
 
@@ -517,6 +537,36 @@ export default async function SuperAdminPage({
                               Generisi test fakturu (DB + email)
                             </button>
                           </form>
+
+                          {provider.plan_status === "suspended" ? (
+                            <form action={activateProviderAction} className="mt-2">
+                              <input
+                                type="hidden"
+                                name="provider_id"
+                                value={provider.id}
+                              />
+                              <button
+                                type="submit"
+                                className="btn-primary inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-primary-foreground"
+                              >
+                                Ponovo aktiviraj nalog
+                              </button>
+                            </form>
+                          ) : provider.plan_status !== "cancelled" ? (
+                            <form action={suspendProviderAction} className="mt-2">
+                              <input
+                                type="hidden"
+                                name="provider_id"
+                                value={provider.id}
+                              />
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 px-4 text-sm font-semibold text-destructive transition hover:bg-destructive/15"
+                              >
+                                Suspenduj nalog
+                              </button>
+                            </form>
+                          ) : null}
                         </div>
                       </div>
                     </div>

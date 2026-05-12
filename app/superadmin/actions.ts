@@ -107,7 +107,7 @@ export async function confirmInvoicePaymentAction(formData: FormData) {
 
   const { data: invoice } = await admin
     .from("invoices")
-    .select("id, provider_id, amount, status, paid_at")
+    .select("id, provider_id, amount, status, paid_at, payment_method")
     .eq("id", invoiceId)
     .maybeSingle();
 
@@ -117,7 +117,7 @@ export async function confirmInvoicePaymentAction(formData: FormData) {
 
   const { data: provider } = await admin
     .from("providers")
-    .select("id, slug, agent_id, agent_commission_percent")
+    .select("id, slug, agent_id, referrer_agent_id, agent_commission_percent")
     .eq("id", invoice.provider_id)
     .maybeSingle();
 
@@ -130,7 +130,7 @@ export async function confirmInvoicePaymentAction(formData: FormData) {
     .update({
       status: "paid",
       paid_at: new Date().toISOString(),
-      payment_method: "virman",
+      payment_method: invoice.payment_method ?? "virman",
     })
     .eq("id", invoice.id);
 
@@ -144,28 +144,79 @@ export async function confirmInvoicePaymentAction(formData: FormData) {
       .from("agent_commissions")
       .select("id")
       .eq("invoice_id", invoice.id)
-      .maybeSingle();
+      .limit(1);
 
-    if (!existingCommission) {
-      const { data: agent } = await admin
+    if (!existingCommission?.length) {
+      const { data: topAgent } = await admin
         .from("agents")
         .select("id, default_commission_percent")
         .eq("id", provider.agent_id)
         .maybeSingle();
 
-      if (agent) {
-        const percent =
-          provider.agent_commission_percent ?? agent.default_commission_percent;
-        const amount = Math.round((invoice.amount * percent) / 100);
+      if (topAgent) {
+        const totalPercent =
+          provider.agent_commission_percent ?? topAgent.default_commission_percent;
+        const commissionRows = [];
 
-        await admin.from("agent_commissions").insert({
-          agent_id: agent.id,
-          invoice_id: invoice.id,
-          provider_id: provider.id,
-          percent,
-          amount,
-          status: "pending",
-        });
+        if (
+          provider.referrer_agent_id &&
+          provider.referrer_agent_id !== provider.agent_id
+        ) {
+          const { data: commercialist } = await admin
+            .from("agents")
+            .select("id, default_commission_percent, parent_agent_id, role")
+            .eq("id", provider.referrer_agent_id)
+            .maybeSingle();
+
+          if (
+            commercialist &&
+            commercialist.role === "commercialist" &&
+            commercialist.parent_agent_id === provider.agent_id
+          ) {
+            const commercialistPercent = Math.min(
+              commercialist.default_commission_percent,
+              totalPercent,
+            );
+            const agentPercent = Math.max(0, totalPercent - commercialistPercent);
+
+            if (commercialistPercent > 0) {
+              commissionRows.push({
+                agent_id: commercialist.id,
+                invoice_id: invoice.id,
+                provider_id: provider.id,
+                percent: commercialistPercent,
+                amount: Math.round((invoice.amount * commercialistPercent) / 100),
+                status: "pending",
+              });
+            }
+
+            if (agentPercent > 0) {
+              commissionRows.push({
+                agent_id: topAgent.id,
+                invoice_id: invoice.id,
+                provider_id: provider.id,
+                percent: agentPercent,
+                amount: Math.round((invoice.amount * agentPercent) / 100),
+                status: "pending",
+              });
+            }
+          }
+        }
+
+        if (commissionRows.length === 0 && totalPercent > 0) {
+          commissionRows.push({
+            agent_id: topAgent.id,
+            invoice_id: invoice.id,
+            provider_id: provider.id,
+            percent: totalPercent,
+            amount: Math.round((invoice.amount * totalPercent) / 100),
+            status: "pending",
+          });
+        }
+
+        if (commissionRows.length > 0) {
+          await admin.from("agent_commissions").insert(commissionRows);
+        }
       }
     }
   }
@@ -175,4 +226,74 @@ export async function confirmInvoicePaymentAction(formData: FormData) {
   revalidatePath("/admin/naplata");
   revalidatePath("/admin");
   revalidatePath(`/${provider.slug}`);
+}
+
+export async function suspendProviderAction(formData: FormData) {
+  const providerId = readString(formData, "provider_id");
+
+  if (!providerId) {
+    redirect("/superadmin?error=missing-provider");
+  }
+
+  const { admin } = await requireSuperAdmin();
+  const { data: provider } = await admin
+    .from("providers")
+    .select("id, slug, plan_status")
+    .eq("id", providerId)
+    .maybeSingle();
+
+  if (!provider) {
+    redirect("/superadmin?error=missing-provider");
+  }
+
+  if (provider.plan_status === "cancelled") {
+    redirect("/superadmin?error=provider-status-change-failed");
+  }
+
+  const { error } = await admin
+    .from("providers")
+    .update({ plan_status: "suspended" })
+    .eq("id", provider.id);
+
+  if (error) {
+    redirect("/superadmin?error=provider-status-change-failed");
+  }
+
+  revalidatePath("/superadmin");
+  revalidatePath("/admin");
+  revalidatePath(`/${provider.slug}`);
+  redirect("/superadmin?notice=provider-suspended");
+}
+
+export async function activateProviderAction(formData: FormData) {
+  const providerId = readString(formData, "provider_id");
+
+  if (!providerId) {
+    redirect("/superadmin?error=missing-provider");
+  }
+
+  const { admin } = await requireSuperAdmin();
+  const { data: provider } = await admin
+    .from("providers")
+    .select("id, slug")
+    .eq("id", providerId)
+    .maybeSingle();
+
+  if (!provider) {
+    redirect("/superadmin?error=missing-provider");
+  }
+
+  const { error } = await admin
+    .from("providers")
+    .update({ plan_status: "active" })
+    .eq("id", provider.id);
+
+  if (error) {
+    redirect("/superadmin?error=provider-status-change-failed");
+  }
+
+  revalidatePath("/superadmin");
+  revalidatePath("/admin");
+  revalidatePath(`/${provider.slug}`);
+  redirect("/superadmin?notice=provider-activated");
 }
