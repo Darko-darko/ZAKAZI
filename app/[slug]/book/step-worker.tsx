@@ -17,10 +17,10 @@ export function StepWorker({ slug, workers }: StepWorkerProps) {
   return (
     <section>
       <h2 className="text-2xl font-bold tracking-tight text-foreground">
-        Kod koga ideš?
+        Izaberi radnika
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Izaberi osobu kod koje želiš termin.
+        Izaberi radnika kod kog zelis da zakazes termin.
       </p>
 
       <Link
@@ -46,17 +46,14 @@ export function StepWorker({ slug, workers }: StepWorkerProps) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-foreground">Bilo ko</span>
+            <span className="font-semibold text-foreground">Bilo koji radnik</span>
             <span className="rounded-full bg-warm-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warm-foreground">
-              Najbrže
+              Najbrze
             </span>
           </span>
           <span className="block text-xs text-muted-foreground">
-            Najbrži slobodan termin
+            Najbrzi slobodan termin
           </span>
-        </span>
-        <span aria-hidden className="text-brand transition group-hover:translate-x-0.5">
-          →
         </span>
       </Link>
 

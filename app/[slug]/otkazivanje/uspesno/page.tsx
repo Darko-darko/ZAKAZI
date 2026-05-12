@@ -15,7 +15,7 @@ export default async function CancellationSuccessPage({
 }: CancellationSuccessPageProps) {
   const { slug } = await params;
   const query = await searchParams;
-  const emailSent = firstParam(query.email) === "1";
+  const emailStatus = firstParam(query.email);
 
   return (
     <main className="flex flex-1 bg-background px-5 py-8">
@@ -42,11 +42,17 @@ export default async function CancellationSuccessPage({
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
             Otkazivanje je uspesno evidentirano.
           </h1>
-          <p className="mt-3 text-muted-foreground">
-            {emailSent
-              ? "Poslali smo i email potvrde o otkazivanju."
-              : "Salon ce videti promenu u svom admin panelu."}
-          </p>
+          <div
+            className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+              emailStatus === "sent"
+                ? "border-brand/20 bg-brand-soft/40 text-foreground"
+                : "border-amber-300/40 bg-amber-50 text-amber-900"
+            }`}
+          >
+            {emailStatus === "sent"
+              ? "Potvrda otkazivanja poslata je na email adresu sa koje je termin zakazan."
+              : "Termin je otkazan, ali potvrdu emailom trenutno nismo poslali. Promena je ipak evidentirana."}
+          </div>
           <Link
             href={`/${slug}`}
             className="btn-primary mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl px-4 font-semibold text-primary-foreground"

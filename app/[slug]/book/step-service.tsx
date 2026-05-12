@@ -18,10 +18,10 @@ export function StepService({ slug, workerParam, services }: StepServiceProps) {
   return (
     <section>
       <h2 className="text-2xl font-bold tracking-tight text-foreground">
-        Šta zakazuješ?
+        Izaberi uslugu
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Izaberi uslugu — termin se prilagođava trajanju.
+        Izaberi uslugu. Slobodni termini se prilagodjavaju njenom trajanju.
       </p>
 
       {services.length ? (
@@ -61,12 +61,6 @@ export function StepService({ slug, workerParam, services }: StepServiceProps) {
               <p className="shrink-0 text-base font-semibold text-brand">
                 {formatPrice(service.price)}
               </p>
-              <span
-                aria-hidden
-                className="ml-1 hidden text-brand transition group-hover:translate-x-0.5 sm:inline"
-              >
-                →
-              </span>
             </Link>
           ))}
         </div>

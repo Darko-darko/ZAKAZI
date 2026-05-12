@@ -20,9 +20,10 @@ type BookingPageProps = {
 };
 
 type Step = 1 | 2 | 3 | 4;
+type BookingEmailStatus = "sent" | "failed" | "skipped" | "unknown";
 
 const STEP_LABELS: Record<Step, string> = {
-  1: "Osoba",
+  1: "Radnik",
   2: "Usluga",
   3: "Termin",
   4: "Podaci",
@@ -35,6 +36,40 @@ function dateFromTimestamp(value: string) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(value));
+}
+
+function resolveBookingSuccessCopy(status: string | undefined) {
+  const emailStatus = (status ?? "unknown") as BookingEmailStatus;
+
+  if (emailStatus === "sent") {
+    return {
+      tone: "border-brand/20 bg-brand-soft/40 text-foreground",
+      message:
+        "Potvrda termina i link za otkazivanje poslati su na unetu email adresu.",
+    };
+  }
+
+  if (emailStatus === "failed") {
+    return {
+      tone: "border-amber-300/40 bg-amber-50 text-amber-900",
+      message:
+        "Termin je uspesno zakazan, ali potvrdu emailom trenutno nismo uspeli da posaljemo. Ako ne stigne, kontaktiraj salon.",
+    };
+  }
+
+  if (emailStatus === "skipped") {
+    return {
+      tone: "border-amber-300/40 bg-amber-50 text-amber-900",
+      message:
+        "Termin je uspesno zakazan, ali potvrda emailom trenutno nije poslata. Ako ti je potrebna potvrda, kontaktiraj salon.",
+    };
+  }
+
+  return {
+    tone: "border-amber-300/40 bg-amber-50 text-amber-900",
+    message:
+      "Termin je uspesno zakazan. Status email potvrde trenutno nije dostupan, pa proveri sanduce ili kontaktiraj salon ako je potrebno.",
+  };
 }
 
 export default async function BookingPage({
@@ -54,6 +89,7 @@ export default async function BookingPage({
   }
 
   const success = firstParam(query.success) === "1";
+  const emailStatus = firstParam(query.email);
   const error = firstParam(query.error);
   const workerParam = firstParam(query.worker);
   const serviceParam = firstParam(query.service);
@@ -61,6 +97,8 @@ export default async function BookingPage({
   const dateParam = firstParam(query.date);
 
   if (success) {
+    const successCopy = resolveBookingSuccessCopy(emailStatus);
+
     return (
       <main className="flex flex-1 bg-background px-5 py-8">
         <section className="mx-auto flex w-full max-w-md flex-col justify-center">
@@ -83,11 +121,13 @@ export default async function BookingPage({
               Termin je zakazan
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              Hvala, termin je rezervisan.
+              Hvala, termin je uspesno zakazan.
             </h1>
-            <p className="mt-3 text-muted-foreground">
-              Potvrda i detalji termina stižu na email.
-            </p>
+            <div
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${successCopy.tone}`}
+            >
+              {successCopy.message}
+            </div>
             <Link
               href={`/${provider.slug}`}
               className="btn-primary mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl px-4 font-semibold text-primary-foreground"
@@ -106,9 +146,10 @@ export default async function BookingPage({
   const workerList = workers ?? [];
 
   const isAnyWorker = workerParam === ANY_WORKER;
-  const selectedWorker = workerParam && !isAnyWorker
-    ? workerList.find((worker) => worker.id === workerParam)
-    : undefined;
+  const selectedWorker =
+    workerParam && !isAnyWorker
+      ? workerList.find((worker) => worker.id === workerParam)
+      : undefined;
 
   const validWorker = isAnyWorker || Boolean(selectedWorker);
   const effectiveWorkerParam = validWorker ? workerParam! : undefined;
@@ -148,7 +189,7 @@ export default async function BookingPage({
           href={`/${provider.slug}`}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-brand"
         >
-          <span aria-hidden>←</span> Nazad na stranicu
+          <span aria-hidden>&lt;-</span> Nazad na stranicu
         </Link>
 
         <header className="mt-4">
@@ -420,7 +461,7 @@ async function Step4({
   if (!service || !worker || !startsAt) {
     return (
       <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium text-destructive">
-        Termin nije važeći. Vrati se i izaberi ponovo.
+        Izabrani termin vise nije vazeci. Vrati se i izaberi termin ponovo.
       </div>
     );
   }

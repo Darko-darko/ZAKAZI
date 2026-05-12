@@ -5,9 +5,18 @@ import { sendBookingEmails } from "@/lib/email/booking";
 import { createClient } from "@/lib/supabase/server";
 import { ANY_WORKER, buildBookingUrl } from "./utils";
 
+type ClientEmailStatus = "sent" | "failed" | "skipped" | "unknown";
+
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function buildSuccessUrl(slug: string, emailStatus: ClientEmailStatus) {
+  const search = new URLSearchParams();
+  search.set("success", "1");
+  search.set("email", emailStatus);
+  return `${buildBookingUrl(slug, {})}?${search.toString()}`;
 }
 
 function redirectWithError(
@@ -85,15 +94,19 @@ export async function createBookingAction(slug: string, formData: FormData) {
   if (error || !bookingId) {
     redirectWithError(
       slug,
-      "Termin više nije slobodan. Izaberi drugi termin.",
+      "Termin vise nije slobodan. Izaberi drugi termin.",
       formData,
     );
   }
+
+  let emailStatus: ClientEmailStatus = "unknown";
 
   try {
     const emailResult = await sendBookingEmails(bookingId, {
       triggerSource: "public_booking",
     });
+
+    emailStatus = emailResult.client?.status ?? "unknown";
 
     if (emailResult.client?.status === "failed") {
       console.error("Client booking email nije poslat.", {
@@ -102,11 +115,12 @@ export async function createBookingAction(slug: string, formData: FormData) {
       });
     }
   } catch (emailError) {
+    emailStatus = "failed";
     console.error("Booking je sacuvan, ali booking email dispatch nije uspeo.", {
       bookingId,
       error: emailError,
     });
   }
 
-  redirect(buildBookingUrl(slug, {}) + "?success=1");
+  redirect(buildSuccessUrl(slug, emailStatus));
 }

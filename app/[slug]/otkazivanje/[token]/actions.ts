@@ -23,8 +23,6 @@ export async function cancelBookingAction(
   revalidatePath(`/${slug}/book`);
 
   const search = new URLSearchParams();
-  if (result.sentClientConfirmation) {
-    search.set("email", "1");
-  }
+  search.set("email", result.sentClientConfirmation ? "sent" : "failed");
   redirect(`/${slug}/otkazivanje/uspesno?${search.toString()}`);
 }

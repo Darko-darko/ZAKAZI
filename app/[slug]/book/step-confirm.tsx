@@ -38,7 +38,7 @@ export function StepConfirm({
         Potvrdi termin
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Proveri detalje i unesi podatke za potvrdu.
+        Proveri detalje i unesi svoje podatke za potvrdu termina.
       </p>
 
       <div className="mt-5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -47,7 +47,7 @@ export function StepConfirm({
             Tvoj termin
           </p>
           <p className="mt-0.5 text-lg font-semibold">
-            {formatDateLong(date)} · {formatTime(startsAt)}
+            {formatDateLong(date)} - {formatTime(startsAt)}
           </p>
         </div>
         <dl className="divide-y divide-border">
@@ -70,7 +70,7 @@ export function StepConfirm({
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4 p-4">
-            <dt className="text-sm text-muted-foreground">Termin kod</dt>
+            <dt className="text-sm text-muted-foreground">Radnik</dt>
             <dd className="text-right font-semibold text-foreground">
               {workerName}
             </dd>
@@ -135,6 +135,10 @@ export function StepConfirm({
             autoComplete="email"
             className="min-h-12 w-full rounded-lg border border-input bg-background px-3 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
+          <p className="text-xs text-muted-foreground">
+            Email je obavezan jer na njega saljemo potvrdu termina i link za
+            otkazivanje.
+          </p>
         </div>
         <div className="space-y-2">
           <label
@@ -155,7 +159,7 @@ export function StepConfirm({
           type="submit"
           className="btn-primary min-h-12 w-full rounded-xl px-4 font-semibold text-primary-foreground"
         >
-          Zakaži termin
+          Zakazi termin
         </button>
       </form>
     </section>

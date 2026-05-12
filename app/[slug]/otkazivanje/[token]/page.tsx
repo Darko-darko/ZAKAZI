@@ -118,7 +118,7 @@ export default async function CancellationPage({
             {context.providerName}
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Proveri detalje ispod pre nego sto potvrdis otkazivanje.
+            Proveri detalje ispod pre nego sto potvrdis otkazivanje termina.
           </p>
 
           <div className="mt-6 overflow-hidden rounded-xl border border-border bg-background">

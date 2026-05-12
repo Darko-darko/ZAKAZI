@@ -79,7 +79,7 @@ export async function updateBookingStatusAction(
     .eq("provider_id", provider.id);
 
   if (error) {
-    throw new Error("Status termina nije sačuvan.");
+    throw new Error("Status termina nije sacuvan.");
   }
 
   revalidatePath("/admin");
@@ -108,7 +108,7 @@ export async function createManualBookingAction(formData: FormData) {
     !clientEmail
   ) {
     redirect(
-      buildManualUrl(formData, "Popuni radnika, uslugu, termin i podatke mušterije."),
+      buildManualUrl(formData, "Popuni radnika, uslugu, termin i podatke klijenta."),
     );
   }
 
@@ -127,7 +127,7 @@ export async function createManualBookingAction(formData: FormData) {
     redirect(
       buildManualUrl(
         formData,
-        "Termin više nije slobodan. Izaberi drugi slobodan termin.",
+        "Termin vise nije slobodan. Izaberi drugi slobodan termin.",
       ),
     );
   }
