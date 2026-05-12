@@ -1,4 +1,4 @@
-export type PlanId = "free" | "basic" | "pro";
+export type PlanId = "free" | "basic" | "pro" | "standard";
 
 export type PlanDetails = {
   id: PlanId;
@@ -15,7 +15,7 @@ export type PlanDetails = {
 export const plans: Record<PlanId, PlanDetails> = {
   free: {
     id: "free",
-    label: "Free",
+    label: "Trial",
     monthlyPriceRsd: 0,
     features: {
       customDomain: false,
@@ -26,30 +26,46 @@ export const plans: Record<PlanId, PlanDetails> = {
   },
   basic: {
     id: "basic",
-    label: "Basic",
-    monthlyPriceRsd: 2900,
+    label: "Standard",
+    monthlyPriceRsd: 2990,
     features: {
       customDomain: false,
       whiteLabel: false,
-      maxWorkers: 3,
+      maxWorkers: null,
       prioritySupport: false,
     },
   },
   pro: {
     id: "pro",
-    label: "Pro",
-    monthlyPriceRsd: 4900,
+    label: "Standard",
+    monthlyPriceRsd: 2990,
     features: {
-      customDomain: true,
-      whiteLabel: true,
+      customDomain: false,
+      whiteLabel: false,
       maxWorkers: null,
-      prioritySupport: true,
+      prioritySupport: false,
+    },
+  },
+  standard: {
+    id: "standard",
+    label: "Standard",
+    monthlyPriceRsd: 2990,
+    features: {
+      customDomain: false,
+      whiteLabel: false,
+      maxWorkers: null,
+      prioritySupport: false,
     },
   },
 };
 
 export function getPlan(planId: string): PlanDetails {
-  if (planId === "basic" || planId === "pro" || planId === "free") {
+  if (
+    planId === "basic" ||
+    planId === "pro" ||
+    planId === "free" ||
+    planId === "standard"
+  ) {
     return plans[planId];
   }
   return plans.free;

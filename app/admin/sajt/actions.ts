@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { normalizeSiteFontChoice } from "@/lib/providers/site";
 
 export type SiteBrandingState = {
   ok: boolean;
   message: string;
 };
 
-const fontChoices = new Set(["default", "serif", "modern", "elegant"]);
+const fontChoices = new Set(["sans", "serif", "default", "modern", "elegant"]);
 const siteThemes = new Set(["default", "light", "dark"]);
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
 
@@ -29,7 +30,7 @@ function readColor(formData: FormData, key: string, fallback: string) {
 
 function readFontChoice(formData: FormData) {
   const value = readString(formData, "font_choice");
-  return fontChoices.has(value) ? value : "default";
+  return fontChoices.has(value) ? normalizeSiteFontChoice(value) : "sans";
 }
 
 function readSiteTheme(formData: FormData) {

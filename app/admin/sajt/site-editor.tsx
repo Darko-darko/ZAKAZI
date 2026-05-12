@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import {
+  getSiteFontClass,
+  normalizeSiteFontChoice,
+  type SiteFontChoice,
+} from "@/lib/providers/site";
 import { createClient } from "@/lib/supabase/client";
 import { ShareSiteButton } from "./share-site-button";
 import {
@@ -14,7 +19,6 @@ const acceptedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxFileSize = 5 * 1024 * 1024;
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
 
-type FontChoice = "default" | "serif" | "modern" | "elegant";
 type SiteTheme = "default" | "light" | "dark";
 
 type SiteEditorProvider = {
@@ -76,22 +80,6 @@ function getFileExtension(file: File) {
   }
 
   return "jpg";
-}
-
-function getFontClass(fontChoice: string) {
-  if (fontChoice === "serif") {
-    return "font-serif";
-  }
-
-  if (fontChoice === "modern") {
-    return "font-sans";
-  }
-
-  if (fontChoice === "elegant") {
-    return "font-serif";
-  }
-
-  return "font-sans";
 }
 
 function getThemeClasses(siteTheme: string) {
@@ -194,6 +182,29 @@ const siteThemeOptions: Array<{
   },
 ];
 
+const fontOptions: Array<{
+  value: SiteFontChoice;
+  label: string;
+  description: string;
+  previewClassName: string;
+  previewText: string;
+}> = [
+  {
+    value: "sans",
+    label: "Savremen",
+    description: "Cist, neutralan i pregledan za vecinu salona i studija.",
+    previewClassName: "font-sans",
+    previewText: "Jasan naslov i brz booking tok.",
+  },
+  {
+    value: "serif",
+    label: "Elegantan",
+    description: "Topliji i izrazeniji stil za premium ili editorial utisak.",
+    previewClassName: "font-serif",
+    previewText: "Naglasen naslov i mirniji ritam citanja.",
+  },
+];
+
 export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   const router = useRouter();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -218,11 +229,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
     cover_focal_y: normalizeCoverFocalY(provider.cover_focal_y),
     primary_color: provider.primary_color,
     text_color: provider.text_color,
-    font_choice: (["default", "serif", "modern", "elegant"].includes(
-      provider.font_choice,
-    )
-      ? provider.font_choice
-      : "default") as FontChoice,
+    font_choice: normalizeSiteFontChoice(provider.font_choice),
     site_theme: (["default", "light", "dark"].includes(provider.site_theme)
       ? provider.site_theme
       : "default") as SiteTheme,
@@ -472,26 +479,54 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
 
           <div className="mt-5 space-y-6">
             <div className="space-y-2">
-              <label
-                htmlFor="font_choice"
-                className="text-sm font-medium text-foreground"
-              >
-                Font cele stranice
-              </label>
-              <select
+              <input
+                type="hidden"
                 id="font_choice"
                 name="font_choice"
                 value={draft.font_choice}
-                onChange={(event) =>
-                  setField("font_choice", event.target.value)
-                }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
-              >
-                <option value="default">Default</option>
-                <option value="modern">Modern</option>
-                <option value="serif">Serif</option>
-                <option value="elegant">Elegant</option>
-              </select>
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Font cele stranice
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Ranije 4 opcije realno su se svodile na 2 ista stila. Sada su
+                  ostale dve jasne varijante koje se dosledno vide i u preview-u
+                  i na javnoj strani.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {fontOptions.map((option) => {
+                  const active = draft.font_choice === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setField("font_choice", option.value)}
+                      className={
+                        active
+                          ? "rounded-md border border-ring bg-accent p-4 text-left ring-2 ring-ring/20"
+                          : "rounded-md border border-border bg-background p-4 text-left transition hover:bg-accent"
+                      }
+                    >
+                      <span
+                        className={`block text-lg font-semibold text-foreground ${option.previewClassName}`}
+                      >
+                        {option.label}
+                      </span>
+                      <span
+                        className={`mt-2 block text-sm text-muted-foreground ${option.previewClassName}`}
+                      >
+                        {option.previewText}
+                      </span>
+                      <span className="mt-3 block text-xs leading-5 text-muted-foreground">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-3 rounded-md border border-border bg-background p-4">
@@ -977,7 +1012,7 @@ function MiniSitePreview({
       </div>
       <div className="mx-auto w-full max-w-[min(100%,24rem)] overflow-hidden rounded-[1.25rem] border-4 border-foreground bg-background shadow-sm min-[380px]:rounded-[2rem] min-[380px]:border-8">
       <div className="h-5 bg-foreground min-[380px]:h-6" />
-      <div className={`min-h-[42rem] ${getFontClass(draft.font_choice)}`}>
+      <div className={`min-h-[42rem] ${getSiteFontClass(draft.font_choice)}`}>
         <section
           ref={heroFrameRef}
           className="relative flex min-h-[31rem] flex-col justify-end overflow-hidden px-4 pb-5 pt-16 min-[380px]:min-h-[32rem] min-[380px]:px-5 min-[380px]:pb-6 min-[380px]:pt-20"

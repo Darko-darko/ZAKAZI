@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPublicProviderBySlug } from "@/lib/providers/public";
+import { getProviderStatusLabel, isProviderBookableStatus } from "@/lib/providers/site";
 import { createClient } from "@/lib/supabase/server";
 import { StepConfirm } from "./step-confirm";
 import { StepService } from "./step-service";
@@ -78,15 +80,54 @@ export default async function BookingPage({
 }: BookingPageProps) {
   const { slug } = await params;
   const query = await searchParams;
-  const supabase = await createClient();
-  const { data: providers } = await supabase.rpc("get_public_provider", {
-    p_slug: slug,
-  });
-  const provider = providers?.[0];
+  const provider = await getPublicProviderBySlug(slug);
 
   if (!provider) {
     notFound();
   }
+
+  if (!isProviderBookableStatus(provider.plan_status)) {
+    return (
+      <main className="flex flex-1 bg-background px-5 py-8">
+        <section className="mx-auto flex w-full max-w-lg flex-col justify-center">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <p className="text-sm font-medium uppercase tracking-wide text-amber-700">
+              Online zakazivanje
+            </p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {provider.name}
+            </h1>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Online zakazivanje trenutno nije dostupno jer je nalog{" "}
+              {getProviderStatusLabel(provider.plan_status)}.
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Javno zakazivanje je privremeno iskljuceno. Ako ti je potreban
+              termin, kontaktiraj salon direktno.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={`/${provider.slug}`}
+                className="btn-secondary inline-flex min-h-12 items-center justify-center rounded-xl px-4 font-semibold text-foreground"
+              >
+                Nazad na stranicu
+              </Link>
+              {provider.phone ? (
+                <a
+                  href={`tel:${provider.phone}`}
+                  className="btn-primary inline-flex min-h-12 items-center justify-center rounded-xl px-4 font-semibold text-primary-foreground"
+                >
+                  Pozovi salon
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const supabase = await createClient();
 
   const success = firstParam(query.success) === "1";
   const emailStatus = firstParam(query.email);

@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { getPublicProviderBySlug } from "@/lib/providers/public";
+import {
+  getProviderStatusLabel,
+  getSiteFontClass,
+  isProviderBookableStatus,
+} from "@/lib/providers/site";
 
 type PublicProviderPageProps = {
   params: Promise<{ slug: string }>;
@@ -13,18 +18,6 @@ function formatPrice(price: number | null) {
   }
 
   return `${price.toLocaleString("sr-RS")} RSD`;
-}
-
-function getFontClass(fontChoice: string | null) {
-  if (fontChoice === "serif") {
-    return "font-serif";
-  }
-
-  if (fontChoice === "elegant") {
-    return "font-serif";
-  }
-
-  return "font-sans";
 }
 
 function getThemeClasses(siteTheme: string | null) {
@@ -124,28 +117,41 @@ export default async function PublicProviderPage({
   params,
 }: PublicProviderPageProps) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: providers } = await supabase.rpc("get_public_provider", {
-    p_slug: slug,
-  });
-  const provider = providers?.[0];
+  const provider = await getPublicProviderBySlug(slug);
 
   if (!provider) {
     notFound();
   }
 
   const adminSupabase = createAdminClient();
+  const bookingAvailable = isProviderBookableStatus(provider.plan_status);
   const [
     { data: services },
     { data: workers },
     { data: gallery },
     { data: nonWorkingDays },
   ] = await Promise.all([
-    supabase.rpc("get_public_services", { p_provider_id: provider.id }),
-    supabase.rpc("get_public_workers", { p_provider_id: provider.id }),
-    supabase.rpc("get_public_provider_gallery", {
-      p_provider_id: provider.id,
-    }),
+    adminSupabase
+      .from("services")
+      .select("id, name, duration_minutes, price, sort_order")
+      .eq("provider_id", provider.id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+    adminSupabase
+      .from("workers")
+      .select("id, name, photo_url, bio")
+      .eq("provider_id", provider.id)
+      .eq("is_active", true)
+      .is("archived_at", null)
+      .order("created_at", { ascending: true })
+      .order("name", { ascending: true }),
+    adminSupabase
+      .from("provider_gallery")
+      .select("id, image_url, sort_order")
+      .eq("provider_id", provider.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
     adminSupabase
       .from("time_off")
       .select("id, date_from, date_to, reason, is_public_holiday")
@@ -161,10 +167,189 @@ export default async function PublicProviderPage({
   const theme = getThemeClasses(provider.site_theme);
   const coverFocalX = normalizeCoverFocalX(provider.cover_focal_x);
   const coverFocalY = normalizeCoverFocalY(provider.cover_focal_y);
+  const bookingUnavailableMessage = bookingAvailable
+    ? null
+    : `Online zakazivanje trenutno nije dostupno jer je nalog ${getProviderStatusLabel(provider.plan_status)}.`;
+
+  if (!bookingAvailable) {
+    const location = [provider.address, provider.city].filter(Boolean).join(", ");
+
+    return (
+      <main
+        className={`flex-1 bg-background ${getSiteFontClass(provider.font_choice)}`}
+      >
+        <section
+          className="relative overflow-hidden"
+          style={{
+            backgroundColor: provider.primary_color,
+            color: provider.text_color,
+          }}
+        >
+          {heroImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={heroImage}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: `${coverFocalX}% ${coverFocalY}%` }}
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/70" />
+
+          <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-20 sm:px-8 sm:pb-12 sm:pt-24">
+            <div className="max-w-3xl rounded-[1.75rem] border border-white/15 bg-white/10 p-5 shadow-sm shadow-black/25 backdrop-blur-md sm:p-7">
+              {provider.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={provider.logo_url}
+                  alt=""
+                  className="mb-5 size-16 rounded-2xl border border-white/25 bg-white object-cover shadow-sm shadow-black/20"
+                />
+              ) : null}
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/74">
+                Online zakazivanje
+              </p>
+              <h1 className="mt-3 max-w-2xl break-words text-[clamp(2.35rem,10vw,4.75rem)] font-bold leading-[0.95] tracking-tight">
+                {provider.name}
+              </h1>
+              {heroText ? (
+                <p className="mt-4 max-w-2xl text-base leading-7 text-white/88 sm:text-lg">
+                  {heroText}
+                </p>
+              ) : null}
+              <div className="mt-5 rounded-2xl border border-amber-200/70 bg-amber-50/92 px-4 py-4 text-sm text-amber-950 shadow-sm">
+                {bookingUnavailableMessage}
+              </div>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                {provider.phone ? (
+                  <a
+                    href={`tel:${provider.phone}`}
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl border px-5 font-semibold shadow-sm shadow-black/15 transition hover:-translate-y-0.5 hover:bg-white/12 hover:shadow-md"
+                    style={{
+                      borderColor: "color-mix(in oklab, white 24%, transparent)",
+                      color: provider.text_color,
+                    }}
+                  >
+                    Pozovi salon
+                  </a>
+                ) : null}
+                <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 font-semibold text-white/72">
+                  Novi termini su privremeno iskljuceni
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className={theme.page}>
+          <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className={`rounded-[1.5rem] border p-6 sm:p-7 ${theme.card}`}>
+              <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${theme.badge}`}>
+                Status
+              </div>
+              <h2 className={`mt-3 text-2xl font-bold tracking-tight ${theme.heading}`}>
+                Booking trenutno nije dostupan
+              </h2>
+              <p className={`mt-4 text-base leading-7 ${theme.muted}`}>
+                Javna stranica je i dalje vidljiva, ali novi online termini ne
+                mogu da se rezervisu dok se nalog ponovo ne aktivira.
+              </p>
+
+              {services?.length ? (
+                <div className={`mt-6 divide-y rounded-[1.25rem] border ${theme.border}`}>
+                  {services.map((service) => (
+                    <div
+                      key={service.id}
+                      className="flex flex-col gap-3 px-4 py-4 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between"
+                    >
+                      <div>
+                        <p className={`font-semibold ${theme.heading}`}>
+                          {service.name}
+                        </p>
+                        <p className={`mt-1 text-sm ${theme.muted}`}>
+                          {service.duration_minutes} min
+                        </p>
+                      </div>
+                      <p className={`text-sm font-semibold min-[420px]:shrink-0 ${theme.heading}`}>
+                        {formatPrice(service.price)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <aside className="space-y-5">
+              <div className={`rounded-[1.5rem] border p-5 ${theme.card}`}>
+                <h2 className={`text-lg font-semibold ${theme.heading}`}>Kontakt</h2>
+                <div className={`mt-4 space-y-3 text-sm ${theme.muted}`}>
+                  {location ? (
+                    <div className={`rounded-2xl border px-4 py-3 ${theme.feature}`}>
+                      {location}
+                    </div>
+                  ) : null}
+                  {provider.phone ? (
+                    <a
+                      href={`tel:${provider.phone}`}
+                      className={`block rounded-2xl border px-4 py-3 transition hover:-translate-y-0.5 ${theme.feature}`}
+                    >
+                      {provider.phone}
+                    </a>
+                  ) : null}
+                  <div className={`rounded-2xl border px-4 py-3 ${theme.feature}`}>
+                    zakazi.pro/{provider.slug}
+                  </div>
+                </div>
+              </div>
+
+              {workers?.length ? (
+                <div className={`rounded-[1.5rem] border p-5 ${theme.card}`}>
+                  <h2 className={`text-lg font-semibold ${theme.heading}`}>Tim</h2>
+                  <div className="mt-4 space-y-3">
+                    {workers.slice(0, 4).map((worker) => (
+                      <div
+                        key={worker.id}
+                        className={`flex items-center gap-3 rounded-2xl border p-3 ${theme.feature}`}
+                      >
+                        {worker.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={worker.photo_url}
+                            alt=""
+                            className="size-11 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${theme.avatar}`}
+                          >
+                            {getInitials(worker.name)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className={`truncate text-sm font-medium ${theme.heading}`}>
+                            {worker.name}
+                          </p>
+                          {worker.bio ? (
+                            <p className={`mt-0.5 line-clamp-2 text-xs leading-5 ${theme.muted}`}>
+                              {worker.bio}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </aside>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main
-      className={`flex-1 bg-background ${getFontClass(provider.font_choice)}`}
+      className={`flex-1 bg-background ${getSiteFontClass(provider.font_choice)}`}
     >
       <section
         className="relative overflow-hidden"

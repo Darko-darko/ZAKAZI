@@ -313,6 +313,18 @@ export default async function SuperAdminPage({
           </div>
         ) : null}
 
+        {notice === "provider-suspended-email-sent" ? (
+          <div className="rounded-xl border border-warm/40 bg-warm-soft px-4 py-3 text-sm font-medium text-foreground">
+            Nalog je rucno suspendovan i poslato je email obavestenje salonu.
+          </div>
+        ) : null}
+
+        {notice === "provider-suspended-email-failed" ? (
+          <div className="rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+            Nalog je rucno suspendovan, ali email obavestenje salonu nije poslato.
+          </div>
+        ) : null}
+
         {notice === "provider-activated" ? (
           <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
             Nalog je ponovo rucno aktiviran.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth/superadmin";
+import { sendProviderSuspendedEmail } from "@/lib/email/provider-status";
 import { issueTrialInvoice } from "@/lib/invoices/issue-trial-invoice";
 
 function readString(formData: FormData, key: string) {
@@ -238,7 +239,7 @@ export async function suspendProviderAction(formData: FormData) {
   const { admin } = await requireSuperAdmin();
   const { data: provider } = await admin
     .from("providers")
-    .select("id, slug, plan_status")
+    .select("id, slug, name, billing_email, plan_status")
     .eq("id", providerId)
     .maybeSingle();
 
@@ -259,10 +260,29 @@ export async function suspendProviderAction(formData: FormData) {
     redirect("/superadmin?error=provider-status-change-failed");
   }
 
+  let suspendNotice = "provider-suspended";
+
+  if (provider.billing_email) {
+    try {
+      await sendProviderSuspendedEmail({
+        to: provider.billing_email,
+        providerName: provider.name,
+        providerSlug: provider.slug,
+      });
+      suspendNotice = "provider-suspended-email-sent";
+    } catch (emailError) {
+      console.error("Suspended provider email nije poslat.", {
+        providerId: provider.id,
+        error: emailError,
+      });
+      suspendNotice = "provider-suspended-email-failed";
+    }
+  }
+
   revalidatePath("/superadmin");
   revalidatePath("/admin");
   revalidatePath(`/${provider.slug}`);
-  redirect("/superadmin?notice=provider-suspended");
+  redirect(`/superadmin?notice=${suspendNotice}`);
 }
 
 export async function activateProviderAction(formData: FormData) {

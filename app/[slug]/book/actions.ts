@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { sendBookingEmails } from "@/lib/email/booking";
+import { getPublicProviderBySlug } from "@/lib/providers/public";
+import { isProviderBookableStatus } from "@/lib/providers/site";
 import { createClient } from "@/lib/supabase/server";
 import { ANY_WORKER, buildBookingUrl } from "./utils";
 
@@ -48,15 +50,21 @@ function redirectWithError(
 }
 
 export async function createBookingAction(slug: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: providers } = await supabase.rpc("get_public_provider", {
-    p_slug: slug,
-  });
-  const provider = providers?.[0];
+  const provider = await getPublicProviderBySlug(slug);
 
   if (!provider) {
     redirectWithError(slug, "Stranica za zakazivanje nije dostupna.", formData);
   }
+
+  if (!isProviderBookableStatus(provider.plan_status)) {
+    redirectWithError(
+      slug,
+      "Online zakazivanje trenutno nije dostupno.",
+      formData,
+    );
+  }
+
+  const supabase = await createClient();
 
   const workerId = readString(formData, "worker_id");
   const serviceId = readString(formData, "service_id");

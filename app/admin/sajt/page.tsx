@@ -3,6 +3,7 @@ import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
+import { normalizeSiteFontChoice } from "@/lib/providers/site";
 
 const READINESS_WEEK_DAYS = [
   [1, "ponedeljak"],
@@ -63,6 +64,7 @@ export default async function AdminSitePage() {
           typeof providerResult.data.site_theme === "string"
             ? providerResult.data.site_theme
             : "default",
+        font_choice: normalizeSiteFontChoice(providerResult.data.font_choice),
       }
     : null;
 

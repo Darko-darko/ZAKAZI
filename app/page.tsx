@@ -16,14 +16,14 @@ const benefits = [
 ];
 
 const steps = [
-  "Uneseš osnovne podatke, radnike i usluge.",
-  "Podeliš svoj zakazi.pro link klijentima.",
+  "Uneses osnovne podatke, radnike i usluge.",
+  "Podelis svoj zakazi.pro link klijentima.",
   "Klijenti zakazuju termin 24/7, bez naloga.",
 ];
 
 const miniSiteServices = [
   { name: "Tretman lica", duration: "45 min", price: "3.200 RSD" },
-  { name: "Relaks masaža", duration: "60 min", price: "4.000 RSD" },
+  { name: "Relaks masaza", duration: "60 min", price: "4.000 RSD" },
   { name: "Konsultacije", duration: "20 min", price: "0 RSD" },
 ];
 
@@ -31,20 +31,14 @@ const plans = [
   {
     name: "Trial",
     price: "0 RSD / 30 dana",
-    note: "Za probu, podešavanje naloga i prve online termine",
+    note: "Za probu, podesavanje naloga i prve online termine",
     features: ["Stranica za zakazivanje", "Online booking", "Osnovni raspored"],
   },
   {
-    name: "Basic",
-    price: "3.500 RSD",
-    note: "Za biznise koji žele stabilan dnevni tok",
-    features: ["Više radnika", "Usluge i smene", "Email obaveštenja"],
-  },
-  {
-    name: "Pro",
-    price: "5.000 RSD",
-    note: "Za timove kojima je sajt glavni kanal",
-    features: ["Custom domen", "Napredna podešavanja", "Prioritetna podrška"],
+    name: "Standard",
+    price: "2.990 RSD",
+    note: "Za salone i studije koji zele stabilan online booking bez komplikovanja",
+    features: ["Vise radnika", "Usluge i smene", "Email obavestenja"],
   },
 ];
 
@@ -78,7 +72,7 @@ export default function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-14 sm:px-6 sm:py-18 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
           <div className="flex flex-col justify-center">
             <p className="mb-4 w-fit rounded-full border border-brand bg-background px-3 py-1 text-sm font-medium text-brand">
-              Napravljeno za uslužne biznise u Srbiji
+              Napravljeno za usluzne biznise u Srbiji
             </p>
             <h1 className="max-w-3xl text-4xl font-bold leading-[1.05] sm:text-5xl lg:text-6xl">
               Online zakazivanje za salone, studije i ordinacije
@@ -86,7 +80,7 @@ export default function HomePage() {
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
               zakazi.pro daje tvom biznisu profesionalnu stranicu za
               zakazivanje i booking tok. Klijenti biraju uslugu, radnika i
-              slobodan termin bez poziva, čekanja i dopisivanja.
+              slobodan termin bez poziva, cekanja i dopisivanja.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -99,7 +93,7 @@ export default function HomePage() {
                 href="/login"
                 className="inline-flex items-center justify-center rounded-md border-2 border-brand px-6 py-3 font-medium text-foreground transition hover:bg-background"
               >
-                Već imam nalog
+                Vec imam nalog
               </Link>
             </div>
             <div className="mt-8 grid gap-4 text-sm text-muted-foreground sm:grid-cols-3">
@@ -125,7 +119,7 @@ export default function HomePage() {
                   <p className="text-sm text-muted-foreground">Stranica za zakazivanje</p>
                   <h2 className="mt-1 text-2xl font-semibold">Studio Aurora</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Kozmetički tretmani i masaže, Novi Sad
+                    Kozmeticki tretmani i masaze, Novi Sad
                   </p>
                 </div>
                 <span className="rounded-full bg-warm-soft px-3 py-1 text-xs font-medium text-warm-foreground">
@@ -134,7 +128,7 @@ export default function HomePage() {
               </div>
 
               <div className="grid gap-3 py-5 sm:grid-cols-3">
-                {["Tretman lica", "Masaža", "Konsultacije"].map((service) => (
+                {["Tretman lica", "Masaza", "Konsultacije"].map((service) => (
                   <div
                     key={service}
                     className="rounded-md border border-border bg-brand-soft p-3"
@@ -188,7 +182,7 @@ export default function HomePage() {
             Za vlasnika
           </p>
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-            Više zakazanih termina, manje administracije
+            Vise zakazanih termina, manje administracije
           </h2>
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -214,10 +208,10 @@ export default function HomePage() {
               Primer stranice za zakazivanje
             </p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Stranica koju možeš odmah da pošalješ klijentima
+              Stranica koju mozes odmah da posaljes klijentima
             </h2>
             <p className="mt-4 leading-7 text-muted-foreground">
-              Stranica za zakazivanje prikazuje šta radiš, gde se nalaziš i
+              Stranica za zakazivanje prikazuje sta radis, gde se nalazis i
               koji termini su slobodni. Klijent ne mora da instalira aplikaciju
               niti da pravi nalog.
             </p>
@@ -229,7 +223,7 @@ export default function HomePage() {
                 <p className="text-sm opacity-90">Salon, studio ili ordinacija</p>
                 <h3 className="mt-2 text-2xl font-semibold">Aurora Beauty Studio</h3>
                 <p className="mt-2 text-sm opacity-90">
-                  Cara Dušana 18, Novi Sad • pon-sub 09-20h
+                  Cara Dusana 18, Novi Sad • pon-sub 09-20h
                 </p>
               </div>
 
@@ -269,10 +263,10 @@ export default function HomePage() {
                     ))}
                   </div>
                   <button className="mt-4 w-full rounded-md bg-brand px-4 py-3 font-medium text-brand-foreground">
-                    Zakaži termin
+                    Zakazi termin
                   </button>
                   <p className="mt-3 text-center text-xs text-muted-foreground">
-                    Potvrda stiže klijentu i vlasniku.
+                    Potvrda stize klijentu i vlasniku.
                   </p>
                 </div>
               </div>
@@ -314,15 +308,15 @@ export default function HomePage() {
               Planovi
             </p>
             <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
-              Kreni jednostavno, nadogradi kad poraste potražnja
+              Kreni jednostavno, nadogradi kad poraste potraznja
             </h2>
           </div>
           <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-            Svaki nalog kreće sa 30 dana probnog perioda za 0 RSD. Posle toga
-            biraš Basic ili Pro, prema tome šta tvom biznisu treba.
+            Svaki nalog krece sa 30 dana probnog perioda za 0 RSD. Posle toga
+            nastavljas sa Standard planom za svakodnevni rad.
           </p>
         </div>
-        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
           {plans.map((plan) => (
             <article
               key={plan.name}
