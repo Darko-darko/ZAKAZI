@@ -99,6 +99,7 @@ export default async function AdminSitePage() {
       .from("workers")
       .select("id, name")
       .eq("provider_id", currentProvider.id)
+      .eq("is_active", true)
       .is("archived_at", null),
     supabase
       .from("services")

@@ -57,6 +57,7 @@ export default async function WorkersPage({ searchParams }: WorkersPageProps) {
         .from("workers")
         .select("id, name")
         .eq("provider_id", provider.id)
+        .eq("is_active", true)
         .is("archived_at", null),
       supabase.from("worker_services").select("worker_id"),
     ]);
