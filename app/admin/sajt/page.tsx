@@ -3,6 +3,7 @@ import { ShareSiteButton } from "./share-site-button";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
+import { findWorkingHourCoverageGaps } from "@/lib/admin/working-hours-coverage";
 import { normalizeSiteFontChoice } from "@/lib/providers/site";
 
 const READINESS_WEEK_DAYS = [
@@ -194,6 +195,14 @@ export default async function AdminSitePage() {
 
     return false;
   });
+  const uncoveredWorkingHourGaps = findWorkingHourCoverageGaps({
+    schedules: relevantWorkerSchedules,
+    workingHours: allWorkingHours,
+    shifts: allShifts,
+  });
+  const uncoveredWorkingDays = new Set(
+    uncoveredWorkingHourGaps.map((gap) => gap.dayOfWeek),
+  );
   const daysWithWorkers = new Set(
     relevantWorkerSchedules
       .filter(
@@ -316,6 +325,18 @@ export default async function AdminSitePage() {
             invalidScheduleRows.length === 1
               ? "Jedna smena ili raspored je van otvorenog radnog vremena."
               : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+          href: "/admin/raspored",
+        });
+      }
+
+      if (uncoveredWorkingDays.size > 0) {
+        readinessAlerts.push({
+          key: "working_hours_uncovered",
+          title: "Nepokriveni sati",
+          description:
+            uncoveredWorkingDays.size === 1
+              ? "Otvoreno radno vreme ima sate bez ijednog radnika u rasporedu."
+              : `${uncoveredWorkingDays.size} otvorena dana imaju sate bez ijednog radnika u rasporedu.`,
           href: "/admin/raspored",
         });
       }

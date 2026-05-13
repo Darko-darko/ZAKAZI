@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/auth/actions";
 import { ManualBookingFilters } from "@/app/admin/_components/manual-booking-filters";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import { findWorkingHourCoverageGaps } from "@/lib/admin/working-hours-coverage";
 import { isSuperAdminEmail } from "@/lib/auth/roles";
 import {
   createManualBookingAction,
@@ -444,6 +445,14 @@ export default async function AdminBookingsPage({
 
     return false;
   });
+  const uncoveredWorkingHourGaps = findWorkingHourCoverageGaps({
+    schedules: relevantWorkerSchedules,
+    workingHours: workingHours ?? [],
+    shifts: shifts ?? [],
+  });
+  const uncoveredWorkingDays = new Set(
+    uncoveredWorkingHourGaps.map((gap) => gap.dayOfWeek),
+  );
   const daysWithWorkers = new Set(
     relevantWorkerSchedules
       .filter((row) => row.shift_id || row.custom_start_time)
@@ -473,7 +482,8 @@ export default async function AdminBookingsPage({
     hasOpenWorkingHours,
     hasWorkerSchedule &&
       openDaysWithoutWorkers.length === 0 &&
-      invalidScheduleRows.length === 0,
+      invalidScheduleRows.length === 0 &&
+      uncoveredWorkingDays.size === 0,
   ];
   const totalSetupSteps = setupCompleted.length;
   const completedSetupSteps = setupCompleted.filter(Boolean).length;
@@ -580,6 +590,19 @@ export default async function AdminBookingsPage({
             invalidScheduleRows.length === 1
               ? "Jedna smena ili raspored je van otvorenog radnog vremena."
               : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena.`,
+          href: "/admin/raspored",
+          severity: "critical",
+        });
+      }
+
+      if (uncoveredWorkingDays.size > 0) {
+        alerts.push({
+          key: "working_hours_uncovered",
+          title: "Nepokriveni sati",
+          description:
+            uncoveredWorkingDays.size === 1
+              ? "Otvoreno radno vreme ima sate bez ijednog radnika u rasporedu."
+              : `${uncoveredWorkingDays.size} otvorena dana imaju sate bez ijednog radnika u rasporedu.`,
           href: "/admin/raspored",
           severity: "critical",
         });

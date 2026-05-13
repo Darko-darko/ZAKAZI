@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentProvider } from "@/lib/admin/provider";
 import { AdminAlertBox } from "@/app/admin/_components/admin-alert-box";
 import { AdminBackLink } from "@/app/admin/_components/admin-back-link";
+import { findWorkingHourCoverageGaps } from "@/lib/admin/working-hours-coverage";
 import { updateScheduleMatrixAction } from "./actions";
 import { ScheduleMatrixForm } from "./schedule-matrix-form";
 
@@ -141,6 +142,11 @@ export default async function SchedulePage() {
 
     return false;
   });
+  const uncoveredWorkingHourGaps = findWorkingHourCoverageGaps({
+    schedules: relevantScheduleRows,
+    workingHours: workingHourRows,
+    shifts: shiftRows,
+  });
   const showNoScheduleAlert =
     !hasAnySchedule && (workers ?? []).length > 0 && workingHourRows.some((row) => !row.is_closed);
 
@@ -203,6 +209,27 @@ export default async function SchedulePage() {
                 : `${invalidScheduleRows.length} rasporeda ili smena izlaze van otvorenog radnog vremena salona — slobodni termini se nece prikazati ispravno.`
             }
           />
+        ) : null}
+
+        {uncoveredWorkingHourGaps.length ? (
+          <AdminAlertBox
+            title="Nepokriveni sati u radnom vremenu."
+            description="Neki delovi otvorenog radnog vremena nemaju nijednog radnika u rasporedu, pa klijenti tada nece videti slobodne termine."
+          >
+            <ul className="mt-3 list-disc space-y-1 pl-5">
+              {uncoveredWorkingHourGaps.map((gap) => {
+                const dayName =
+                  weekDays.find(([dayIndex]) => dayIndex === gap.dayOfWeek)?.[1] ??
+                  "ovaj dan";
+
+                return (
+                  <li key={`${gap.dayOfWeek}-${gap.gapStart}-${gap.gapEnd}`}>
+                    Za {dayName} nema pokrica od {gap.gapStart} do {gap.gapEnd}.
+                  </li>
+                );
+              })}
+            </ul>
+          </AdminAlertBox>
         ) : null}
 
         <ScheduleMatrixForm
