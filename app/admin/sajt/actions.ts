@@ -159,3 +159,82 @@ export async function updateSiteAssetAction(
 
   return { url: publicUrl };
 }
+
+export async function updateSiteGalleryImageAction(
+  sortOrder: number,
+  assetPath: string,
+) {
+  const { supabase, provider } = await getCurrentProvider();
+  const normalizedPath = assetPath.trim();
+
+  if (sortOrder < 0 || sortOrder > 5) {
+    throw new Error("Pozicija galerije nije ispravna.");
+  }
+
+  if (
+    !normalizedPath.startsWith(
+      `providers/${provider.id}/gallery/${sortOrder + 1}/`,
+    )
+  ) {
+    throw new Error("Putanja galerijske slike nije ispravna.");
+  }
+
+  const publicUrl = supabase.storage
+    .from("provider-assets")
+    .getPublicUrl(normalizedPath).data.publicUrl;
+
+  const { data: existingImage, error: existingError } = await supabase
+    .from("provider_gallery")
+    .select("id")
+    .eq("provider_id", provider.id)
+    .eq("sort_order", sortOrder)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error("Galerijska slika nije sacuvana. Pokusaj ponovo.");
+  }
+
+  const { error } = existingImage
+    ? await supabase
+        .from("provider_gallery")
+        .update({ image_url: publicUrl })
+        .eq("id", existingImage.id)
+        .eq("provider_id", provider.id)
+    : await supabase.from("provider_gallery").insert({
+        provider_id: provider.id,
+        sort_order: sortOrder,
+        image_url: publicUrl,
+      });
+
+  if (error) {
+    throw new Error("Galerijska slika nije sacuvana. Pokusaj ponovo.");
+  }
+
+  revalidatePath("/admin/sajt");
+  revalidatePath(`/${provider.slug}`);
+
+  return { url: publicUrl };
+}
+
+export async function removeSiteGalleryImageAction(sortOrder: number) {
+  const { supabase, provider } = await getCurrentProvider();
+
+  if (sortOrder < 0 || sortOrder > 5) {
+    throw new Error("Pozicija galerije nije ispravna.");
+  }
+
+  const { error } = await supabase
+    .from("provider_gallery")
+    .delete()
+    .eq("provider_id", provider.id)
+    .eq("sort_order", sortOrder);
+
+  if (error) {
+    throw new Error("Galerijska slika nije uklonjena. Pokusaj ponovo.");
+  }
+
+  revalidatePath("/admin/sajt");
+  revalidatePath(`/${provider.slug}`);
+
+  return { ok: true };
+}

@@ -76,6 +76,7 @@ export default async function AdminSitePage() {
   const [
     { data: services },
     { data: workers },
+    { data: gallery },
     { data: readinessWorkers },
     { data: readinessServices },
     { data: readinessWorkerServices },
@@ -98,6 +99,12 @@ export default async function AdminSitePage() {
       .is("archived_at", null)
       .order("created_at", { ascending: true })
       .order("name", { ascending: true }),
+    supabase
+      .from("provider_gallery")
+      .select("id, image_url, sort_order")
+      .eq("provider_id", currentProvider.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
     supabase
       .from("workers")
       .select("id, name")
@@ -412,6 +419,7 @@ export default async function AdminSitePage() {
               provider={provider}
               services={services ?? []}
               workers={workers ?? []}
+              gallery={gallery ?? []}
             />
           </div>
         </div>

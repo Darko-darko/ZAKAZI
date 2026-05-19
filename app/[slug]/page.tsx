@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -163,6 +164,7 @@ export default async function PublicProviderPage({
   ]);
 
   const heroImage = provider.cover_url ?? gallery?.[0]?.image_url ?? null;
+  const galleryImages = (gallery ?? []).slice(0, 6);
   const heroText = provider.intro_text;
   const theme = getThemeClasses(provider.site_theme);
   const coverFocalX = normalizeCoverFocalX(provider.cover_focal_x);
@@ -186,18 +188,21 @@ export default async function PublicProviderPage({
           }}
         >
           {heroImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={heroImage}
               alt=""
+              fill
+              priority
+              quality={82}
+              sizes="100vw"
               className="absolute inset-0 h-full w-full object-cover"
               style={{ objectPosition: `${coverFocalX}% ${coverFocalY}%` }}
             />
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/22 to-black/58" />
 
           <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-20 sm:px-8 sm:pb-12 sm:pt-24">
-            <div className="max-w-3xl rounded-[1.75rem] border border-white/15 bg-white/10 p-5 shadow-sm shadow-black/25 backdrop-blur-md sm:p-7">
+            <div className="max-w-3xl rounded-[1.75rem] border border-white/15 bg-black/28 p-5 shadow-sm shadow-black/25 sm:p-7">
               {provider.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -359,27 +364,30 @@ export default async function PublicProviderPage({
         }}
       >
         {heroImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={heroImage}
             alt=""
+            fill
+            priority
+            quality={82}
+            sizes="100vw"
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: `${coverFocalX}% ${coverFocalY}%` }}
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/65" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/22 to-black/55" />
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background/20 to-transparent" />
 
         <div className="relative mx-auto flex min-h-[78svh] w-full max-w-6xl items-end px-4 pb-8 pt-20 sm:px-8 sm:pb-10 sm:pt-24">
           <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
             <div className="max-w-3xl">
-              <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/20 bg-white/12 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/92 backdrop-blur-sm">
+              <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/20 bg-black/28 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/92">
                 <span>Online zakazivanje</span>
                 <span className="h-1 w-1 rounded-full bg-white/60" />
                 <span>zakazi.pro/{provider.slug}</span>
               </div>
 
-              <div className="mt-5 rounded-[1.75rem] border border-white/15 bg-white/10 p-5 shadow-sm shadow-black/25 backdrop-blur-md sm:p-7">
+              <div className="mt-5 rounded-[1.75rem] border border-white/15 bg-black/28 p-5 shadow-sm shadow-black/25 sm:p-7">
                 {provider.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -427,7 +435,7 @@ export default async function PublicProviderPage({
             </div>
 
             <div className="hidden lg:block">
-              <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-5 text-white shadow-sm shadow-black/20 backdrop-blur-md">
+              <div className="rounded-[1.5rem] border border-white/15 bg-black/28 p-5 text-white shadow-sm shadow-black/20">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
                   Brz pregled
                 </p>
@@ -490,6 +498,41 @@ export default async function PublicProviderPage({
                           ? "Praznik."
                           : "Salon ne radi u ovom periodu.")}
                     </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {galleryImages.length ? (
+            <div className={`mb-8 rounded-[1.5rem] border p-6 sm:p-7 ${theme.card}`}>
+              <div className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${theme.badge}`}>
+                    Galerija
+                  </div>
+                  <h2 className={`mt-3 text-2xl font-bold tracking-tight ${theme.heading}`}>
+                    Prostor, atmosfera i radovi
+                  </h2>
+                </div>
+                <p className={`text-sm ${theme.muted}`}>{galleryImages.length} fotografija</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {galleryImages.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className="group relative aspect-[4/5] overflow-hidden rounded-[1.25rem] border border-black/5 bg-black/5"
+                  >
+                    <Image
+                      src={image.image_url}
+                      alt={`${provider.name} galerija ${index + 1}`}
+                      fill
+                      quality={72}
+                      sizes="(min-width: 1280px) 360px, (min-width: 640px) 50vw, 100vw"
+                      className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
                   </div>
                 ))}
               </div>

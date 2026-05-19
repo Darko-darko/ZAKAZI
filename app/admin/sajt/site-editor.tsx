@@ -10,8 +10,10 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ShareSiteButton } from "./share-site-button";
 import {
+  removeSiteGalleryImageAction,
   type SiteBrandingState,
   updateSiteAssetAction,
+  updateSiteGalleryImageAction,
   updateSiteBrandingAction,
 } from "./actions";
 
@@ -44,6 +46,7 @@ type SiteEditorProps = {
   provider: SiteEditorProvider;
   services: SitePreviewService[];
   workers: SitePreviewWorker[];
+  gallery: SitePreviewGalleryImage[];
 };
 
 type AssetKind = "logo" | "cover";
@@ -62,6 +65,18 @@ type SitePreviewWorker = {
   photo_url: string | null;
   bio: string | null;
   created_at: string;
+};
+
+type SitePreviewGalleryImage = {
+  id: string;
+  image_url: string;
+  sort_order: number;
+};
+
+type GallerySlot = {
+  id: string | null;
+  image_url: string | null;
+  sort_order: number;
 };
 
 function getFileExtension(file: File) {
@@ -156,6 +171,8 @@ const initialState: SiteBrandingState = {
   message: "",
 };
 
+const gallerySlotCount = 6;
+
 const siteThemeOptions: Array<{
   label: string;
   value: SiteTheme;
@@ -205,10 +222,32 @@ const fontOptions: Array<{
   },
 ];
 
-export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
+function buildGallerySlots(images: SitePreviewGalleryImage[]): GallerySlot[] {
+  const bySortOrder = new Map(images.map((image) => [image.sort_order, image]));
+
+  return Array.from({ length: gallerySlotCount }, (_, sortOrder) => {
+    const image = bySortOrder.get(sortOrder);
+
+    return {
+      id: image?.id ?? null,
+      image_url: image?.image_url ?? null,
+      sort_order: sortOrder,
+    };
+  });
+}
+
+export function SiteEditor({
+  provider,
+  services,
+  workers,
+  gallery,
+}: SiteEditorProps) {
   const router = useRouter();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryPreviewUrlsRef = useRef<(string | null)[]>(
+    Array.from({ length: gallerySlotCount }, () => null),
+  );
   const [state, formAction, pending] = useActionState(
     updateSiteBrandingAction,
     initialState,
@@ -216,6 +255,9 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   const [isUploading, startUploadTransition] = useTransition();
   const [assetMessage, setAssetMessage] = useState("");
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [gallerySlots, setGallerySlots] = useState<GallerySlot[]>(
+    buildGallerySlots(gallery),
+  );
   const [draft, setDraft] = useState({
     name: provider.name,
     intro_text: provider.intro_text ?? "",
@@ -240,9 +282,17 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
   }
 
   useEffect(() => {
+    const galleryPreviewUrls = galleryPreviewUrlsRef.current;
+
     return () => {
       if (coverPreviewUrl) {
         URL.revokeObjectURL(coverPreviewUrl);
+      }
+
+      for (const previewUrl of galleryPreviewUrls) {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
       }
     };
   }, [coverPreviewUrl]);
@@ -334,6 +384,119 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
         router.refresh();
       } catch {
         setAssetMessage("Slika nije uklonjena. Pokusaj ponovo.");
+      }
+    });
+  }
+
+  function uploadGalleryImage(sortOrder: number, file: File) {
+    setAssetMessage("");
+
+    if (!acceptedTypes.includes(file.type)) {
+      setAssetMessage("Podrzane su JPG, PNG i WEBP slike.");
+      return;
+    }
+
+    if (file.size > maxFileSize) {
+      setAssetMessage("Slika moze biti najvise 5 MB.");
+      return;
+    }
+
+    const previousImageUrl = gallerySlots[sortOrder]?.image_url ?? null;
+    const nextPreviewUrl = URL.createObjectURL(file);
+    const previousPreviewUrl = galleryPreviewUrlsRef.current[sortOrder];
+
+    if (previousPreviewUrl) {
+      URL.revokeObjectURL(previousPreviewUrl);
+    }
+
+    galleryPreviewUrlsRef.current[sortOrder] = nextPreviewUrl;
+    setGallerySlots((current) =>
+      current.map((slot) =>
+        slot.sort_order === sortOrder
+          ? { ...slot, image_url: nextPreviewUrl }
+          : slot,
+      ),
+    );
+
+    startUploadTransition(async () => {
+      try {
+        const supabase = createClient();
+        const extension = getFileExtension(file);
+        const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const path = `providers/${provider.id}/gallery/${sortOrder + 1}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("provider-assets")
+          .upload(path, file, {
+            cacheControl: "31536000",
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          setGallerySlots((current) =>
+            current.map((slot) =>
+              slot.sort_order === sortOrder
+                ? { ...slot, image_url: previousImageUrl }
+                : slot,
+            ),
+          );
+          setAssetMessage("Upload galerije nije uspeo. Proveri sliku i probaj ponovo.");
+          return;
+        }
+
+        const result = await updateSiteGalleryImageAction(sortOrder, path);
+        setGallerySlots((current) =>
+          current.map((slot) =>
+            slot.sort_order === sortOrder
+              ? { ...slot, image_url: result.url }
+              : slot,
+          ),
+        );
+        setAssetMessage(`Galerijska slika ${sortOrder + 1} je sacuvana.`);
+        router.refresh();
+      } catch {
+        setGallerySlots((current) =>
+          current.map((slot) =>
+            slot.sort_order === sortOrder
+              ? { ...slot, image_url: previousImageUrl }
+              : slot,
+          ),
+        );
+        setAssetMessage("Galerijska slika nije sacuvana. Pokusaj ponovo.");
+      } finally {
+        const previewUrl = galleryPreviewUrlsRef.current[sortOrder];
+
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          galleryPreviewUrlsRef.current[sortOrder] = null;
+        }
+      }
+    });
+  }
+
+  function removeGalleryImage(sortOrder: number) {
+    setAssetMessage("");
+    const previousPreviewUrl = galleryPreviewUrlsRef.current[sortOrder];
+
+    if (previousPreviewUrl) {
+      URL.revokeObjectURL(previousPreviewUrl);
+      galleryPreviewUrlsRef.current[sortOrder] = null;
+    }
+
+    startUploadTransition(async () => {
+      try {
+        await removeSiteGalleryImageAction(sortOrder);
+        setGallerySlots((current) =>
+          current.map((slot) =>
+            slot.sort_order === sortOrder
+              ? { ...slot, id: null, image_url: null }
+              : slot,
+          ),
+        );
+        setAssetMessage(`Galerijska slika ${sortOrder + 1} je uklonjena.`);
+        router.refresh();
+      } catch {
+        setAssetMessage("Galerijska slika nije uklonjena. Pokusaj ponovo.");
       }
     });
   }
@@ -659,7 +822,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
           <div className="space-y-1">
             <h2 className="text-xl font-semibold text-foreground">Slike</h2>
             <p className="text-sm text-muted-foreground">
-              Logo i cover se cuvaju odmah po uploadu.
+              Logo, cover i galerija se cuvaju odmah po uploadu.
             </p>
           </div>
 
@@ -681,6 +844,27 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
               onRemove={() => removeAsset("cover")}
               onUpload={(file) => uploadAsset("cover", file)}
             />
+          </div>
+
+          <div className="mt-6 space-y-3 rounded-xl border border-border bg-background p-4">
+            <div>
+              <h3 className="font-semibold text-foreground">Galerija mini sajta</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ubaci do 6 fotografija. Redosled slotova je isti kao na javnoj stranici.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {gallerySlots.map((slot, index) => (
+                <GallerySlotUploader
+                  key={slot.sort_order}
+                  index={index}
+                  isUploading={isUploading}
+                  url={slot.image_url}
+                  onRemove={() => removeGalleryImage(slot.sort_order)}
+                  onUpload={(file) => uploadGalleryImage(slot.sort_order, file)}
+                />
+              ))}
+            </div>
           </div>
 
           {assetMessage ? (
@@ -726,6 +910,7 @@ export function SiteEditor({ provider, services, workers }: SiteEditorProps) {
         <div className="overflow-x-hidden">
           <MiniSitePreview
             draft={draft}
+            gallery={gallerySlots}
             services={services}
             slug={provider.slug}
             workers={workers}
@@ -829,8 +1014,72 @@ function AssetUploader({
   );
 }
 
+function GallerySlotUploader({
+  index,
+  isUploading,
+  onRemove,
+  onUpload,
+  url,
+}: {
+  index: number;
+  isUploading: boolean;
+  onRemove: () => void;
+  onUpload: (file: File) => void;
+  url: string | null;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-foreground">Slika {index + 1}</p>
+        <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          Slot {index + 1}
+        </span>
+      </div>
+      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="px-4 text-center text-sm text-muted-foreground">
+            Izaberi fotografiju za galeriju.
+          </span>
+        )}
+      </div>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        disabled={isUploading}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+
+          event.target.value = "";
+
+          if (file) {
+            onUpload(file);
+          }
+        }}
+        className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      />
+      {url ? (
+        <button
+          type="button"
+          disabled={isUploading}
+          onClick={onRemove}
+          className="btn-secondary rounded-md px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Ukloni
+        </button>
+      ) : null}
+      <p className="text-xs text-muted-foreground">
+        JPG, PNG ili WEBP, najvise 5 MB.
+      </p>
+    </div>
+  );
+}
+
 function MiniSitePreview({
   draft,
+  gallery,
   services,
   slug,
   workers,
@@ -854,6 +1103,7 @@ function MiniSitePreview({
     font_choice: string;
     site_theme: string;
   };
+  gallery: GallerySlot[];
   services: SitePreviewService[];
   slug: string;
   workers: SitePreviewWorker[];
@@ -864,6 +1114,7 @@ function MiniSitePreview({
   const location = [draft.address, draft.city].filter(Boolean).join(", ");
   const heroText = draft.intro_text;
   const theme = getThemeClasses(draft.site_theme);
+  const galleryImages = gallery.filter((image) => image.image_url);
   const heroFrameRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
     pointerId: number;
@@ -1071,7 +1322,7 @@ function MiniSitePreview({
           ) : null}
           {heroImageUrl ? (
             <>
-              <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black/65" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/22 to-black/55" />
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background/25 to-transparent" />
             </>
           ) : null}
@@ -1084,8 +1335,8 @@ function MiniSitePreview({
                 className="mb-4 size-14 rounded-2xl border border-white/30 bg-white object-cover shadow-sm shadow-black/15"
               />
             ) : null}
-            <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4 shadow-sm shadow-black/20 backdrop-blur-sm">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">
+            <div className="rounded-[1.5rem] border border-white/15 bg-black/28 p-4 shadow-sm shadow-black/20">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/28 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">
                 <span>Online zakazivanje</span>
                 <span className="h-1 w-1 rounded-full bg-white/60" />
                 <span>zakazi.pro/{slug}</span>
@@ -1134,6 +1385,27 @@ function MiniSitePreview({
               >
                 {draft.description}
               </p>
+            </div>
+          ) : null}
+
+          {galleryImages.length ? (
+            <div className={`rounded-md border p-4 ${theme.card}`}>
+              <h4 className={`text-xl font-bold ${theme.heading}`}>Galerija</h4>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {galleryImages.map((image) => (
+                  <div
+                    key={image.sort_order}
+                    className="relative aspect-[4/5] overflow-hidden rounded-xl border border-black/5 bg-black/5"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.image_url ?? ""}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 
