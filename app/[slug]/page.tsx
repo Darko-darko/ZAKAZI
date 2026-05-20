@@ -507,13 +507,8 @@ export default async function PublicProviderPage({
           {galleryImages.length ? (
             <div className={`mb-8 rounded-[1.5rem] border p-6 sm:p-7 ${theme.card}`}>
               <div className="mb-5 flex items-end justify-between gap-4">
-                <div>
-                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${theme.badge}`}>
-                    Galerija
-                  </div>
-                  <h2 className={`mt-3 text-2xl font-bold tracking-tight ${theme.heading}`}>
-                    Prostor, atmosfera i radovi
-                  </h2>
+                <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${theme.badge}`}>
+                  Galerija
                 </div>
                 <p className={`text-sm ${theme.muted}`}>{galleryImages.length} fotografija</p>
               </div>
