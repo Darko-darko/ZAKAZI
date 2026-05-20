@@ -30,7 +30,12 @@ function readColor(formData: FormData, key: string, fallback: string) {
 
 function readFontChoice(formData: FormData) {
   const value = readString(formData, "font_choice");
-  return fontChoices.has(value) ? normalizeSiteFontChoice(value) : "sans";
+
+  if (!fontChoices.has(value)) {
+    return "default";
+  }
+
+  return normalizeSiteFontChoice(value) === "serif" ? "serif" : "default";
 }
 
 function readSiteTheme(formData: FormData) {
@@ -83,31 +88,32 @@ export async function updateSiteBrandingAction(
     primary_color: readColor(formData, "primary_color", "#000000"),
     text_color: readColor(formData, "text_color", "#ffffff"),
   };
+  const legacyCompatibleUpdate = {
+    name: update.name,
+    intro_text: update.intro_text,
+    description: update.description,
+    address: update.address,
+    city: update.city,
+    phone: update.phone,
+    font_choice: update.font_choice,
+    primary_color: update.primary_color,
+    text_color: update.text_color,
+  };
+
   const { error } = await supabase
     .from("providers")
     .update(update)
     .eq("id", provider.id)
     .eq("user_id", provider.user_id);
-  const updateError =
-    error && error.code === "PGRST204"
-      ? (
-          await supabase
-            .from("providers")
-            .update({
-              name: update.name,
-              intro_text: update.intro_text,
-              description: update.description,
-              address: update.address,
-              city: update.city,
-              phone: update.phone,
-              font_choice: update.font_choice,
-              primary_color: update.primary_color,
-              text_color: update.text_color,
-            })
-            .eq("id", provider.id)
-            .eq("user_id", provider.user_id)
-        ).error
-      : error;
+  const updateError = error
+    ? (
+        await supabase
+          .from("providers")
+          .update(legacyCompatibleUpdate)
+          .eq("id", provider.id)
+          .eq("user_id", provider.user_id)
+      ).error
+    : null;
 
   if (updateError) {
     return {
