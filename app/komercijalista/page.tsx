@@ -238,7 +238,7 @@ export default async function CommercialistPage() {
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Provizije će se pojaviti ovde kada neki od tvojih salona plati fakturu.
+              Provizije će se pojaviti ovde kada neki od tvojih salona plati predracun.
             </p>
           )}
         </section>

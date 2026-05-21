@@ -15,10 +15,10 @@ export async function POST(request: Request) {
     const result = await createMonthlyInvoices();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    console.error("Cron za kreiranje faktura nije uspeo.", error);
+    console.error("Cron za kreiranje predracuna nije uspeo.", error);
 
     return NextResponse.json(
-      { error: "Kreiranje faktura nije uspelo." },
+      { error: "Kreiranje predracuna nije uspelo." },
       { status: 500 },
     );
   }

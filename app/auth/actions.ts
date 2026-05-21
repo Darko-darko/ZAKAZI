@@ -42,6 +42,19 @@ function isDuplicateError(message: string | undefined) {
   return message?.toLowerCase().includes("duplicate") ?? false;
 }
 
+function hasMissingColumnError(message: string | undefined, column: string) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return normalized.includes("column") && normalized.includes(column.toLowerCase());
+}
+
+function isLegacyProviderSchemaError(message: string | undefined) {
+  return hasMissingColumnError(message, "referrer_agent_id");
+}
+
 function getLoginErrorMessage(message: string | undefined) {
   const normalized = message?.toLowerCase() ?? "";
 
@@ -312,22 +325,25 @@ async function insertProviderWithAvailableSlug({
 }) {
   const baseSlug = createProviderSlug(name);
   let lastErrorMessage: string | undefined;
+  let supportsReferrerAgentId = true;
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const slug = getSlugCandidate(baseSlug, attempt);
+    const providerPayload = {
+      user_id: userId,
+      name,
+      slug,
+      billing_email: billingEmail,
+      phone: phone || null,
+      city: city || null,
+      agent_id: topLevelAgentId,
+      ref_code: refCode,
+      ...(supportsReferrerAgentId ? { referrer_agent_id: referrerAgentId } : {}),
+    };
+
     const { data, error: providerError } = await supabase
       .from("providers")
-      .insert({
-        user_id: userId,
-        name,
-        slug,
-        billing_email: billingEmail,
-        phone: phone || null,
-        city: city || null,
-        agent_id: topLevelAgentId,
-        referrer_agent_id: referrerAgentId,
-        ref_code: refCode,
-      })
+      .insert(providerPayload)
       .select("id")
       .single();
 
@@ -337,7 +353,18 @@ async function insertProviderWithAvailableSlug({
 
     lastErrorMessage = providerError?.message;
 
+    if (supportsReferrerAgentId && isLegacyProviderSchemaError(providerError?.message)) {
+      supportsReferrerAgentId = false;
+      attempt -= 1;
+      continue;
+    }
+
     if (!isDuplicateError(providerError?.message)) {
+      console.error("Failed to insert provider during auth onboarding", {
+        message: providerError?.message,
+        providerName: name,
+        userId,
+      });
       break;
     }
   }

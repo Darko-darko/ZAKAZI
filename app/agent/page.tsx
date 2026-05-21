@@ -567,7 +567,7 @@ export default async function AgentPage() {
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Provizije će se pojaviti ovde kada salon plati fakturu.
+              Provizije će se pojaviti ovde kada salon plati predracun.
             </p>
           )}
         </section>

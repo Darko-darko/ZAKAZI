@@ -282,7 +282,7 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceData }) {
 
   return (
     <Document
-      title={`Faktura ${invoice.number}`}
+      title={`Predracun ${invoice.number}`}
       author={invoice.platform.legalName}
     >
       <Page size="A4" style={styles.page}>
@@ -294,7 +294,7 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceData }) {
             </Text>
           </View>
           <View style={styles.invoiceMetaBlock}>
-            <Text style={styles.invoiceMetaLabel}>Faktura broj</Text>
+            <Text style={styles.invoiceMetaLabel}>Predracun broj</Text>
             <Text style={styles.invoiceMetaValue}>{invoice.number}</Text>
             <View style={styles.metaRow}>
               <Text style={styles.metaRowLabel}>Datum izdavanja</Text>

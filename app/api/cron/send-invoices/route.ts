@@ -15,10 +15,10 @@ export async function POST(request: Request) {
     const result = await sendPendingInvoices();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    console.error("Cron za slanje faktura nije uspeo.", error);
+    console.error("Cron za slanje predracuna nije uspeo.", error);
 
     return NextResponse.json(
-      { error: "Slanje faktura nije uspelo." },
+      { error: "Slanje predracuna nije uspelo." },
       { status: 500 },
     );
   }

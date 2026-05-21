@@ -25,6 +25,10 @@ export default async function NewWorkerPage() {
           </h1>
         </header>
 
+        <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm text-brand">
+          Sada unesi samo osnovne podatke. Foto, radno vreme i usluge podesićeš nakon snimanja, na stranici radnika.
+        </div>
+
         <div className="rounded-md border border-border bg-card p-6">
           <WorkerForm action={createWorkerAction} submitLabel="Sačuvaj radnika" />
         </div>

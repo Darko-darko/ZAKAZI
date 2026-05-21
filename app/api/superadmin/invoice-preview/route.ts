@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
     ],
     paymentReference: "PREVIEW",
     notes:
-      "Ovo je PREGLED fakture — nije zavedena u sistemu i nije poslata mejlom.",
+      "Ovo je PREGLED predracuna — nije zaveden u sistemu i nije poslat mejlom.",
   };
 
   const pdfBuffer = await renderInvoicePdf(invoiceData);
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'inline; filename="faktura-preview.pdf"',
+      "Content-Disposition": 'inline; filename="predracun-preview.pdf"',
       "Cache-Control": "no-store",
     },
   });

@@ -266,7 +266,7 @@ export default async function SuperAdminAgentsPage() {
               Mesecni obracun provizija
             </h2>
             <p className="text-sm text-muted-foreground">
-              Jedna faktura sada moze napraviti vise stavki, na primer za agenta i
+              Jedan predracun sada moze napraviti vise stavki, na primer za agenta i
               komercijalistu.
             </p>
           </div>

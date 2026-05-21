@@ -259,7 +259,7 @@ export default async function SuperAdminPage({
               Super Admin
             </h1>
             <p className="text-muted-foreground">
-              Pregled salona, faktura i potvrda uplata na jednom mestu.
+              Pregled salona, predracuna i potvrda uplata na jednom mestu.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -303,7 +303,7 @@ export default async function SuperAdminPage({
 
         {notice === "invoice-issued" && noticeNumber ? (
           <div className="rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
-            Faktura {noticeNumber} je generisana, sacuvana u storage i poslata na email.
+            Predracun {noticeNumber} je generisan, sacuvan u storage i poslat na email.
           </div>
         ) : null}
 
@@ -333,7 +333,7 @@ export default async function SuperAdminPage({
 
         {error === "invoice-failed" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-            Generisanje fakture nije uspelo.
+            Generisanje predracuna nije uspelo.
             {errorReason ? (
               <span className="ml-1 font-normal">{errorReason}</span>
             ) : null}
@@ -406,7 +406,7 @@ export default async function SuperAdminPage({
                 Saloni i evidencija placanja
               </h2>
               <p className="text-sm text-muted-foreground">
-                Za svaki salon vidi otvorenu fakturu, prijavljenu uplatu i istoriju potvrda.
+                Za svaki salon vidi otvoren predracun, prijavljenu uplatu i istoriju potvrda.
               </p>
             </div>
           </div>
@@ -460,7 +460,7 @@ export default async function SuperAdminPage({
                           {currentInvoice ? (
                             <>
                               <p className="mt-2 text-lg font-semibold text-foreground">
-                                Faktura {currentInvoice.number}
+                                Predracun {currentInvoice.number}
                               </p>
                               <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                                 {formatMoneyNullable(currentInvoice.amount)}
@@ -486,7 +486,7 @@ export default async function SuperAdminPage({
                             </>
                           ) : (
                             <p className="mt-2 text-sm text-muted-foreground">
-                              Trenutno nema otvorene fakture za potvrdu.
+                              Trenutno nema otvorenog predracuna za potvrdu.
                             </p>
                           )}
                         </div>
@@ -546,7 +546,7 @@ export default async function SuperAdminPage({
                               type="submit"
                               className="btn-secondary inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
                             >
-                              Generisi test fakturu (DB + email)
+                              Generisi test predracun (DB + email)
                             </button>
                           </form>
 
@@ -597,7 +597,7 @@ export default async function SuperAdminPage({
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <p className="font-semibold text-foreground">
-                                    Faktura {invoice.number}
+                                    Predracun {invoice.number}
                                   </p>
                                   <p className="mt-1 text-sm text-muted-foreground">
                                     Potvrdjeno: {formatDate(invoice.paid_at)}
@@ -636,7 +636,7 @@ export default async function SuperAdminPage({
               Podaci platforme za fakturisanje
             </h2>
             <p className="text-sm text-muted-foreground">
-              Ovi podaci se stampaju kao izdavalac na svakoj fakturi koju
+              Ovi podaci se stampaju kao izdavalac na svakom predracunu koji
               zakazi.pro izdaje salonima.
             </p>
           </div>
@@ -749,7 +749,7 @@ export default async function SuperAdminPage({
                 Bankovni racun
               </h3>
               <p className="text-sm text-muted-foreground">
-                Prikazuje se na fakturi sa pozivom na broj fakture.
+                Prikazuje se na predracunu sa pozivom na broj predracuna.
               </p>
 
               <div className="mt-4 space-y-4">
@@ -821,7 +821,7 @@ export default async function SuperAdminPage({
                       Obveznik sam PDV-a
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      Ako je oznaceno, PDV se obracunava i prikazuje na fakturi.
+                      Ako je oznaceno, PDV se obracunava i prikazuje na predracunu.
                     </span>
                   </span>
                 </label>
@@ -849,7 +849,7 @@ export default async function SuperAdminPage({
 
             <div className="border-t border-border pt-5">
               <h3 className="text-base font-semibold text-foreground">
-                Kontakt na fakturi
+                Kontakt na predracunu
               </h3>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
