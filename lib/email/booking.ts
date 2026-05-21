@@ -1,5 +1,9 @@
 import "server-only";
 import { sendEmail } from "@/lib/email/brevo";
+import {
+  getPrimaryNotificationEmail,
+  parseNotificationEmails,
+} from "@/lib/email/notification-emails";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type BookingNotificationRecord = {
@@ -100,6 +104,10 @@ type SendBookingRemindersResult = {
   skipped: number;
   failed: number;
 };
+
+function joinRecipientEmails(emails: string[]) {
+  return emails.length ? emails.join(", ") : null;
+}
 
 type ClientCancellationResult =
   | {
@@ -767,6 +775,24 @@ async function skipBookingEmail(params: {
   return attempt;
 }
 
+async function skipBookingEmails(params: {
+  context: BookingEmailContext;
+  emailType: BookingEmailType;
+  triggerSource: BookingEmailTrigger;
+  recipientEmails: string[];
+  subject: string | null;
+  reason: string;
+}): Promise<BookingEmailAttempt> {
+  return skipBookingEmail({
+    context: params.context,
+    emailType: params.emailType,
+    triggerSource: params.triggerSource,
+    recipientEmail: joinRecipientEmails(params.recipientEmails),
+    subject: params.subject,
+    reason: params.reason,
+  });
+}
+
 async function sendAndLogBookingEmail(params: {
   context: BookingEmailContext;
   emailType: BookingEmailType;
@@ -849,6 +875,86 @@ async function sendAndLogBookingEmail(params: {
   }
 }
 
+async function sendAndLogBookingEmailBatch(params: {
+  context: BookingEmailContext;
+  emailType: BookingEmailType;
+  triggerSource: BookingEmailTrigger;
+  recipientEmails: string[];
+  recipientName?: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  replyTo?: { email: string; name?: string };
+  tags: string[];
+}): Promise<BookingEmailAttempt> {
+  if (params.recipientEmails.length === 0) {
+    return skipBookingEmails({
+      context: params.context,
+      emailType: params.emailType,
+      triggerSource: params.triggerSource,
+      recipientEmails: [],
+      subject: params.subject,
+      reason: "Primalac nema email adresu.",
+    });
+  }
+
+  try {
+    const result = await sendEmail({
+      to: params.recipientEmails.map((email) => ({
+        email,
+        name: params.recipientName,
+      })),
+      subject: params.subject,
+      htmlContent: params.htmlContent,
+      textContent: params.textContent,
+      replyTo: params.replyTo,
+      tags: params.tags,
+    });
+
+    const attempt: BookingEmailAttempt = {
+      status: "sent",
+      recipientEmail: joinRecipientEmails(params.recipientEmails),
+      subject: params.subject,
+      brevoMessageId: result.messageId,
+      errorMessage: null,
+    };
+
+    await recordBookingEmailLog({
+      context: params.context,
+      emailType: params.emailType,
+      triggerSource: params.triggerSource,
+      recipientEmail: attempt.recipientEmail,
+      subject: attempt.subject,
+      status: attempt.status,
+      brevoMessageId: attempt.brevoMessageId,
+    });
+
+    return attempt;
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Nepoznata greska pri slanju emaila.";
+    const attempt: BookingEmailAttempt = {
+      status: "failed",
+      recipientEmail: joinRecipientEmails(params.recipientEmails),
+      subject: params.subject,
+      brevoMessageId: null,
+      errorMessage,
+    };
+
+    await recordBookingEmailLog({
+      context: params.context,
+      emailType: params.emailType,
+      triggerSource: params.triggerSource,
+      recipientEmail: attempt.recipientEmail,
+      subject: attempt.subject,
+      status: attempt.status,
+      errorMessage: attempt.errorMessage,
+    });
+
+    return attempt;
+  }
+}
+
 async function sendBookingEmailWithoutLog(params: {
   recipientEmail: string;
   recipientName?: string;
@@ -900,6 +1006,12 @@ export async function sendBookingEmails(
   const triggerSource = options.triggerSource ?? "public_booking";
   const shouldSendClient = options.sendClient ?? true;
   const shouldSendAdmin = options.sendAdmin ?? true;
+  const providerNotificationEmails = parseNotificationEmails(
+    context.providerBillingEmail,
+  );
+  const providerReplyToEmail = getPrimaryNotificationEmail(
+    context.providerBillingEmail,
+  );
   let client: BookingEmailAttempt | null = null;
   let admin: BookingEmailAttempt | null = null;
 
@@ -916,11 +1028,11 @@ export async function sendBookingEmails(
     }
 
     if (shouldSendAdmin) {
-      admin = await skipBookingEmail({
+      admin = await skipBookingEmails({
         context,
         emailType: "confirmation_admin",
         triggerSource,
-        recipientEmail: context.providerBillingEmail,
+        recipientEmails: providerNotificationEmails,
         subject: buildAdminBookingSubject(context),
         reason: "BOOKING_EMAILS_ENABLED=false",
       });
@@ -940,9 +1052,9 @@ export async function sendBookingEmails(
       htmlContent: buildClientBookingEmail(context),
       textContent: buildClientBookingText(context),
       tags: ["booking-confirmation", context.providerSlug],
-      replyTo: context.providerBillingEmail
+      replyTo: providerReplyToEmail
         ? {
-            email: context.providerBillingEmail,
+            email: providerReplyToEmail,
             name: context.providerName,
           }
         : undefined,
@@ -951,20 +1063,20 @@ export async function sendBookingEmails(
 
   if (shouldSendAdmin) {
     if (!bookingAdminNotificationsEnabled()) {
-      admin = await skipBookingEmail({
+      admin = await skipBookingEmails({
         context,
         emailType: "confirmation_admin",
         triggerSource,
-        recipientEmail: context.providerBillingEmail,
+        recipientEmails: providerNotificationEmails,
         subject: buildAdminBookingSubject(context),
         reason: "BOOKING_ADMIN_NOTIFICATIONS_ENABLED=false",
       });
     } else {
-      admin = await sendAndLogBookingEmail({
+      admin = await sendAndLogBookingEmailBatch({
         context,
         emailType: "confirmation_admin",
         triggerSource,
-        recipientEmail: context.providerBillingEmail,
+        recipientEmails: providerNotificationEmails,
         recipientName: context.providerName,
         subject: buildAdminBookingSubject(context),
         htmlContent: buildAdminBookingEmail(context),
@@ -1123,9 +1235,9 @@ async function sendClaimedBookingReminder(
     htmlContent: buildClientReminderEmail(context),
     textContent: buildClientReminderText(context),
     tags: ["booking-reminder", context.providerSlug],
-    replyTo: context.providerBillingEmail
+    replyTo: getPrimaryNotificationEmail(context.providerBillingEmail)
       ? {
-          email: context.providerBillingEmail,
+          email: getPrimaryNotificationEmail(context.providerBillingEmail) ?? "",
           name: context.providerName,
         }
       : undefined,
@@ -1247,12 +1359,16 @@ export async function cancelBookingByToken(
       sentClientConfirmation = clientAttempt.status === "sent";
     }
 
-    if (bookingAdminNotificationsEnabled() && context.providerBillingEmail) {
-      const adminAttempt = await sendAndLogBookingEmail({
+    const providerNotificationEmails = parseNotificationEmails(
+      context.providerBillingEmail,
+    );
+
+    if (bookingAdminNotificationsEnabled() && providerNotificationEmails.length > 0) {
+      const adminAttempt = await sendAndLogBookingEmailBatch({
         context,
         emailType: "cancellation_admin",
         triggerSource: "client_cancellation",
-        recipientEmail: context.providerBillingEmail,
+        recipientEmails: providerNotificationEmails,
         recipientName: context.providerName,
         subject: buildAdminCancellationSubject(context),
         htmlContent: buildAdminCancellationEmail(context),

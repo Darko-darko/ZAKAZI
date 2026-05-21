@@ -1,6 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/brevo";
+import {
+  hasNotificationEmailList,
+  mapNotificationRecipients,
+} from "@/lib/email/notification-emails";
 import { getPlan } from "@/lib/plans";
 import {
   type InvoiceData,
@@ -40,10 +44,10 @@ function buildInvoiceEmail(params: {
 }) {
   return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
-      <h1 style="margin: 0 0 16px; font-size: 22px;">Faktura ${params.invoiceNumber}</h1>
+      <h1 style="margin: 0 0 16px; font-size: 22px;">Predracun ${params.invoiceNumber}</h1>
       <p>Postovani,</p>
       <p>
-        U prilogu se nalazi faktura broj <strong>${params.invoiceNumber}</strong>
+        U prilogu se nalazi predracun broj <strong>${params.invoiceNumber}</strong>
         za korisnicki nalog <strong>${params.customerName}</strong> na platformi ${params.platformName}.
       </p>
       <table style="margin: 16px 0; border-collapse: collapse; width: 100%;">
@@ -57,7 +61,7 @@ function buildInvoiceEmail(params: {
         </tr>
       </table>
       <p>
-        Faktura ce biti vidljiva i u admin panelu na stranici Naplata,
+        Predracun ce biti vidljiv i u admin panelu na stranici Naplata,
         gde mozete prijaviti uplatu kada je izvrsite.
       </p>
       <p style="margin-top: 24px; color: #64748b; font-size: 13px;">
@@ -100,7 +104,7 @@ export async function issueTrialInvoice(
     !provider.company_address ||
     !provider.company_city ||
     !provider.company_zip ||
-    !provider.billing_email
+    !hasNotificationEmailList(provider.billing_email)
   ) {
     return {
       ok: false,
@@ -139,7 +143,7 @@ export async function issueTrialInvoice(
   if (planDetails.monthlyPriceRsd <= 0) {
     return {
       ok: false,
-      reason: `Plan ${provider.plan} nema definisanu cenu — fakturu nije moguce izdati.`,
+      reason: `Plan ${provider.plan} nema definisanu cenu — predracun nije moguce izdati.`,
     };
   }
 
@@ -169,7 +173,7 @@ export async function issueTrialInvoice(
   if (insertError || !createdInvoice) {
     return {
       ok: false,
-      reason: `Faktura nije kreirana: ${insertError?.message ?? "nepoznata greska"}`,
+      reason: `Predracun nije kreiran: ${insertError?.message ?? "nepoznata greska"}`,
     };
   }
 
@@ -252,10 +256,8 @@ export async function issueTrialInvoice(
 
   try {
     await sendEmail({
-      to: [
-        { email: provider.billing_email, name: provider.company_name },
-      ],
-      subject: `Faktura ${createdInvoice.number} — ${platform.company_legal_name}`,
+      to: mapNotificationRecipients(provider.billing_email, provider.company_name),
+      subject: `Predracun ${createdInvoice.number} — ${platform.company_legal_name}`,
       htmlContent: buildInvoiceEmail({
         customerName: provider.company_name,
         invoiceNumber: createdInvoice.number,
@@ -265,7 +267,7 @@ export async function issueTrialInvoice(
       }),
       attachments: [
         {
-          name: `Faktura-${createdInvoice.number}.pdf`,
+          name: `Predracun-${createdInvoice.number}.pdf`,
           content: pdfBuffer,
         },
       ],
@@ -276,7 +278,7 @@ export async function issueTrialInvoice(
   } catch (error) {
     return {
       ok: false,
-      reason: `Faktura je kreirana ali email nije poslat: ${(error as Error).message}`,
+      reason: `Predracun je kreiran ali email nije poslat: ${(error as Error).message}`,
     };
   }
 

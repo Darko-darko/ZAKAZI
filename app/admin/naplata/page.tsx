@@ -163,7 +163,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     { key: "company_address", label: "Adresa sedista", value: billing.company_address },
     { key: "company_city", label: "Grad", value: billing.company_city },
     { key: "company_zip", label: "Postanski broj", value: billing.company_zip },
-    { key: "billing_email", label: "Email za prijem faktura", value: billing.billing_email },
+    { key: "billing_email", label: "Email za prijem predracuna", value: billing.billing_email },
   ] as const;
   const missingBillingFields = billingRequiredFields.filter((field) => !field.value);
   const billingComplete = missingBillingFields.length === 0;
@@ -216,14 +216,20 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
         {error === "claim-failed" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-            Prijava uplate nije uspela. Moguce je da je faktura vec prijavljena ili
+            Prijava uplate nije uspela. Moguce je da je predracun vec prijavljen ili
             nije u statusu za uplatu.
+          </div>
+        ) : null}
+
+        {error === "invalid-billing-email" ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Unesite ispravne email adrese za prijem obavestenja i predracuna.
           </div>
         ) : null}
 
         {error === "missing-token" ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-            Nedostaje identifikacija fakture za prijavu uplate.
+            Nedostaje identifikacija predracuna za prijavu uplate.
           </div>
         ) : null}
 
@@ -255,8 +261,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           <div className="rounded-xl border border-warm/40 bg-warm-soft px-4 py-3 text-sm text-foreground">
             <p className="font-semibold">Podaci za fakturisanje nisu kompletni.</p>
             <p className="mt-1">
-              Popuni sledeca polja ispod kako bi ti zakazi.pro mogao izdati validnu
-              fakturu:
+              Popuni sledeca polja ispod kako bi ti zakazi.pro mogao izdati validan
+              predracun:
             </p>
             <ul className="mt-2 list-disc space-y-0.5 pl-5">
               {missingBillingFields.map((field) => (
@@ -325,7 +331,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                         <span>
                           <span className="block font-medium">Poslovni racun</span>
                           <span className="block text-xs text-muted-foreground">
-                            Uplata preko firme na racun sa fakture.
+                            Uplata preko firme na racun sa predracuna.
                           </span>
                         </span>
                       </label>
@@ -399,7 +405,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-semibold text-foreground">Pregled faktura</h2>
+          <h2 className="text-lg font-semibold text-foreground">Pregled predracuna</h2>
 
           {invoices.length ? (
             <div className="mt-4 space-y-3">
@@ -407,10 +413,6 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 const signedPdfUrl = invoice.pdf_url
                   ? signedUrlByPath.get(invoice.pdf_url) ?? null
                   : null;
-                const accountantHref =
-                  provider.billing_email && signedPdfUrl
-                    ? `mailto:${provider.billing_email}?subject=Faktura%20${encodeURIComponent(invoice.number)}&body=${encodeURIComponent(signedPdfUrl)}`
-                    : null;
 
                 return (
                   <article
@@ -420,7 +422,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <p className="font-semibold text-foreground">
-                          Faktura {invoice.number}
+                          Predracun {invoice.number}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
                           <span>{formatDateLabel(invoice.due_at)}</span>
@@ -443,15 +445,6 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                             PDF uskoro
                           </div>
                         )}
-
-                        {accountantHref ? (
-                          <Link
-                            href={accountantHref}
-                            className="btn-secondary inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-foreground"
-                          >
-                            Posalji knjigovodji
-                          </Link>
-                        ) : null}
                       </div>
                     </div>
                   </article>
@@ -460,7 +453,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             </div>
           ) : (
             <div className="mt-4 rounded-xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground">
-              Jos nema izdatih faktura.
+              Jos nema izdatih predracuna.
             </div>
           )}
         </section>
@@ -471,8 +464,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               Podaci za fakturisanje
             </h2>
             <p className="text-sm text-muted-foreground">
-              Ovi podaci se stampaju na fakturi koju ti zakazi.pro izdaje. Promenom
-              ovih polja menjaju se i sledece fakture.
+              Ovi podaci se stampaju na predracunu koji ti zakazi.pro izdaje. Promenom
+              ovih polja menjaju se i sledeci predracuni.
             </p>
           </div>
 
@@ -589,18 +582,19 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 htmlFor="billing_email"
                 className="text-sm font-medium text-foreground"
               >
-                Email za prijem faktura
+                Emailovi za prijem obavestenja i predracuna
               </label>
-              <input
+              <textarea
                 id="billing_email"
                 name="billing_email"
-                type="email"
                 defaultValue={billing.billing_email ?? ""}
-                placeholder="racuni@salon-mica.rs"
+                rows={4}
+                placeholder={"racuni@salon-mica.rs\nvlasnik@salon-mica.rs"}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
               <p className="text-xs text-muted-foreground">
-                Na ovaj email ti zakazi.pro salje fakturu sa PDF-om u prilogu.
+                Unesite jednu ili vise adresa, odvojene novim redom ili zarezom.
+                Na ove emailove zakazi.pro salje predracune i admin obavestenja.
               </p>
             </div>
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendEmail } from "@/lib/email/brevo";
+import { mapNotificationRecipients } from "@/lib/email/notification-emails";
 
 function buildProviderSuspendedEmail(params: {
   providerName: string;
@@ -33,7 +34,7 @@ export async function sendProviderSuspendedEmail(params: {
   providerSlug: string;
 }) {
   return sendEmail({
-    to: [{ email: params.to, name: params.providerName }],
+    to: mapNotificationRecipients(params.to, params.providerName),
     subject: `${params.providerName}: online zakazivanje je suspendovano`,
     htmlContent: buildProviderSuspendedEmail(params),
     tags: ["provider-suspended", params.providerSlug],

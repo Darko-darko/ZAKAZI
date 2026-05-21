@@ -1,6 +1,10 @@
 import "server-only";
 
 import { sendEmail } from "@/lib/email/brevo";
+import {
+  hasNotificationEmailList,
+  mapNotificationRecipients,
+} from "@/lib/email/notification-emails";
 import { getPlan } from "@/lib/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -224,7 +228,7 @@ function hasBillingDetails(provider: ProviderBillingRow) {
       provider.company_address &&
       provider.company_city &&
       provider.company_zip &&
-      provider.billing_email,
+      hasNotificationEmailList(provider.billing_email),
   );
 }
 
@@ -248,10 +252,10 @@ function buildInvoiceEmail(params: {
 }) {
   return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
-      <h1 style="margin: 0 0 16px; font-size: 22px;">Faktura ${params.invoiceNumber}</h1>
+      <h1 style="margin: 0 0 16px; font-size: 22px;">Predracun ${params.invoiceNumber}</h1>
       <p>Postovani,</p>
       <p>
-        U prilogu se nalazi faktura broj <strong>${params.invoiceNumber}</strong>
+        U prilogu se nalazi predracun broj <strong>${params.invoiceNumber}</strong>
         za korisnicki nalog <strong>${params.customerName}</strong> na platformi ${params.platformName}.
       </p>
       <table style="margin: 16px 0; border-collapse: collapse; width: 100%;">
@@ -265,7 +269,7 @@ function buildInvoiceEmail(params: {
         </tr>
       </table>
       <p>
-        Faktura ce biti vidljiva i u admin panelu na stranici Naplata,
+        Predracun ce biti vidljiv i u admin panelu na stranici Naplata,
         gde mozete prijaviti uplatu kada je izvrsite.
       </p>
       <p style="margin-top: 24px; color: #64748b; font-size: 13px;">
@@ -286,15 +290,15 @@ function buildBillingReminderEmail(params: {
 
   return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
-      <h1 style="margin: 0 0 16px; font-size: 22px;">Podsetnik za fakturu ${params.invoiceNumber}</h1>
+      <h1 style="margin: 0 0 16px; font-size: 22px;">Podsetnik za predracun ${params.invoiceNumber}</h1>
       <p>Postovani,</p>
       <p>
-        Podsecamo vas da faktura za nalog <strong>${params.providerName}</strong>
+        Podsecamo vas da predracun za nalog <strong>${params.providerName}</strong>
         dospeva za <strong>${dayLabel}</strong>.
       </p>
       <table style="margin: 16px 0; border-collapse: collapse; width: 100%;">
         <tr>
-          <td style="padding: 8px 0; color: #64748b;">Faktura</td>
+          <td style="padding: 8px 0; color: #64748b;">Predracun</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700;">${params.invoiceNumber}</td>
         </tr>
         <tr>
@@ -321,14 +325,14 @@ function buildOverdueEmail(params: {
 }) {
   return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px;">
-      <h1 style="margin: 0 0 16px; font-size: 22px;">Faktura ${params.invoiceNumber} kasni</h1>
+      <h1 style="margin: 0 0 16px; font-size: 22px;">Predracun ${params.invoiceNumber} kasni</h1>
       <p>Postovani,</p>
       <p>
-        Faktura za nalog <strong>${params.providerName}</strong> nije placena do roka i sada je oznacena kao kasnjenje.
+        Predracun za nalog <strong>${params.providerName}</strong> nije placen do roka i sada je oznacen kao kasnjenje.
       </p>
       <table style="margin: 16px 0; border-collapse: collapse; width: 100%;">
         <tr>
-          <td style="padding: 8px 0; color: #64748b;">Faktura</td>
+          <td style="padding: 8px 0; color: #64748b;">Predracun</td>
           <td style="padding: 8px 0; text-align: right; font-weight: 700;">${params.invoiceNumber}</td>
         </tr>
         <tr>
@@ -408,7 +412,7 @@ async function getInvoiceContext(invoiceId: string): Promise<InvoiceContext> {
   ]);
 
   if (invoiceError || !invoice) {
-    throw new Error("Faktura nije pronadjena.");
+    throw new Error("Predracun nije pronadjen.");
   }
 
   const provider = await getProviderBillingRow(invoice.provider_id);
@@ -500,7 +504,7 @@ async function markInvoiceWithNote(invoice: InvoiceRow, marker: string) {
     .eq("id", invoice.id);
 
   if (error) {
-    throw new Error(`Azuriranje fakture ${invoice.number} nije uspelo: ${error.message}`);
+    throw new Error(`Azuriranje predracuna ${invoice.number} nije uspelo: ${error.message}`);
   }
 
   invoice.notes = nextNotes;
@@ -513,7 +517,7 @@ async function sendSimpleBillingEmail(params: {
   replyTo?: { email: string; name?: string };
 }) {
   await sendEmail({
-    to: [{ email: params.to }],
+    to: mapNotificationRecipients(params.to),
     subject: params.subject,
     htmlContent: params.htmlContent,
     replyTo: params.replyTo,
@@ -553,13 +557,11 @@ async function sendInvoiceById(invoiceId: string) {
   }
 
   await sendEmail({
-    to: [
-      {
-        email: context.provider.billing_email ?? "",
-        name: context.provider.company_name ?? context.provider.name,
-      },
-    ],
-    subject: `Faktura ${context.invoice.number} - ${context.platform.company_legal_name}`,
+    to: mapNotificationRecipients(
+      context.provider.billing_email,
+      context.provider.company_name ?? context.provider.name,
+    ),
+    subject: `Predracun ${context.invoice.number} - ${context.platform.company_legal_name}`,
     htmlContent: buildInvoiceEmail({
       customerName: context.provider.company_name ?? context.provider.name,
       invoiceNumber: context.invoice.number,
@@ -569,7 +571,7 @@ async function sendInvoiceById(invoiceId: string) {
     }),
     attachments: [
       {
-        name: `Faktura-${context.invoice.number}.pdf`,
+        name: `Predracun-${context.invoice.number}.pdf`,
         content: pdfBuffer,
       },
     ],
@@ -620,7 +622,7 @@ async function createInvoiceForPeriod(provider: ProviderBillingRow, periodStart:
 
   if (existingError) {
     throw new Error(
-      `Provera postojece fakture za ${provider.name} nije uspela: ${existingError.message}`,
+      `Provera postojeceg predracuna za ${provider.name} nije uspela: ${existingError.message}`,
     );
   }
 
@@ -647,7 +649,7 @@ async function createInvoiceForPeriod(provider: ProviderBillingRow, periodStart:
 
   if (insertError || !createdInvoice) {
     throw new Error(
-      `Kreiranje fakture za ${provider.name} nije uspelo: ${insertError?.message ?? "nepoznata greska"}`,
+      `Kreiranje predracuna za ${provider.name} nije uspelo: ${insertError?.message ?? "nepoznata greska"}`,
     );
   }
 
@@ -749,7 +751,7 @@ export async function sendPendingInvoices() {
     .order("created_at", { ascending: true });
 
   if (error) {
-    throw new Error(`Ucitavanje faktura za slanje nije uspelo: ${error.message}`);
+    throw new Error(`Ucitavanje predracuna za slanje nije uspelo: ${error.message}`);
   }
 
   for (const invoice of (invoices ?? []) as InvoiceRow[]) {
@@ -787,7 +789,7 @@ export async function runBillingCheck() {
     .is("paid_at", null);
 
   if (error) {
-    throw new Error(`Ucitavanje faktura za billing proveru nije uspelo: ${error.message}`);
+    throw new Error(`Ucitavanje predracuna za billing proveru nije uspelo: ${error.message}`);
   }
 
   for (const invoice of (invoices ?? []) as InvoiceRow[]) {
@@ -819,12 +821,14 @@ export async function runBillingCheck() {
         result.overdueMarked += 1;
 
         if (
-          provider.billing_email &&
+          hasNotificationEmailList(provider.billing_email) &&
           !invoice.notes?.includes(OVERDUE_WARNING_MARKER)
         ) {
+          const notificationEmails = provider.billing_email as string;
+
           await sendSimpleBillingEmail({
-            to: provider.billing_email,
-            subject: `Faktura ${invoice.number} kasni`,
+            to: notificationEmails,
+            subject: `Predracun ${invoice.number} kasni`,
             htmlContent: buildOverdueEmail({
               providerName: provider.company_name ?? provider.name,
               invoiceNumber: invoice.number,
@@ -840,12 +844,14 @@ export async function runBillingCheck() {
       if (
         effectiveStatus === "issued" &&
         daysUntilDue === 3 &&
-        provider.billing_email &&
+        hasNotificationEmailList(provider.billing_email) &&
         !invoice.notes?.includes(DUE_REMINDER_MARKER)
       ) {
+        const notificationEmails = provider.billing_email as string;
+
         await sendSimpleBillingEmail({
-          to: provider.billing_email,
-          subject: `Podsetnik za fakturu ${invoice.number}`,
+          to: notificationEmails,
+          subject: `Podsetnik za predracun ${invoice.number}`,
           htmlContent: buildBillingReminderEmail({
             providerName: provider.company_name ?? provider.name,
             invoiceNumber: invoice.number,

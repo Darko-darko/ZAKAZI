@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentProvider } from "@/lib/admin/provider";
+import {
+  formatNotificationEmails,
+  invalidNotificationEmails,
+} from "@/lib/email/notification-emails";
 
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -32,6 +36,13 @@ export async function updateBillingDetailsAction(formData: FormData) {
     redirect("/admin/naplata?error=invalid-mb");
   }
 
+  const billingEmailRaw = readNullableString(formData, "billing_email");
+  const invalidEmails = invalidNotificationEmails(billingEmailRaw);
+
+  if (invalidEmails.length > 0) {
+    redirect("/admin/naplata?error=invalid-billing-email");
+  }
+
   const update = {
     company_name: companyName,
     company_pib: companyPib,
@@ -39,7 +50,7 @@ export async function updateBillingDetailsAction(formData: FormData) {
     company_address: readNullableString(formData, "company_address"),
     company_city: readNullableString(formData, "company_city"),
     company_zip: readNullableString(formData, "company_zip"),
-    billing_email: readNullableString(formData, "billing_email"),
+    billing_email: formatNotificationEmails(billingEmailRaw),
   };
 
   const { error } = await supabase
